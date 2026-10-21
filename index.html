@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookshelf Graph Navigator (Array Edges)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1512;
+            color: #f0e6d2;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .scene {
+            position: relative;
+            width: 600px;
+            height: 350px;
+            background: #2a2018;
+            border: 4px solid #3e2d22;
+            border-radius: 8px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .shelf-title {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            font-size: 14px;
+            color: #b5a48b;
+            letter-spacing: 1px;
+        }
+
+        /* 本棚の板 */
+        .shelf-board {
+            position: absolute;
+            bottom: 40px;
+            left: 20px;
+            right: 20px;
+            height: 16px;
+            background: #4a3525;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+            border-radius: 2px;
+        }
+
+        /* 背表紙コンテナ */
+        .spine-container {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+            height: 220px;
+            padding-bottom: 56px;
+            z-index: 2;
+        }
+
+        /* 背表紙のスタイル */
+        .spine {
+            width: 60px;
+            height: 190px;
+            background-color: #556b2f;
+            border-radius: 3px 3px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 4px;
+            box-sizing: border-box;
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            font-size: 13px;
+            color: #fff;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.3) inset, 2px 2px 5px rgba(0,0,0,0.4);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .spine:hover {
+            transform: translateY(-8px);
+        }
+
+        /* ナビゲーションボタン群（動的生成） */
+        .nav-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            width: 600px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            background: #3e2d22;
+            color: #f0e6d2;
+            border: 1px solid #5c4333;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #5c4333;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="scene">
+        <div class="shelf-title" id="shelfTitle">現在の棚: 読み込み中...</div>
+        
+        <div class="spine-container" id="spineContainer">
+            <!-- 背表紙がここに動的に生成されます -->
+        </div>
+
+        <div class="shelf-board"></div>
+    </div>
+
+    <!-- 動的にエッジ（選択肢）のボタンが並ぶエリア -->
+    <div class="nav-controls" id="navControls"></div>
+
+    <script>
+        // --- 1. モックデータベース（edgesがシンプルな配列に変更） ---
+        const mockDatabase = {
+            'node-1': {
+                id: 'node-1',
+                name: '物理学の棚 (A)',
+                books: [
+                    { title: '量子力学入門', color: '#191970' },
+                    { title: '相対性理論概説', color: '#8b0000' },
+                    { title: '統計力学の基礎', color: '#556b2f' }
+                ],
+                edges: [
+                    { label: '◀ 左の棚へ', action: 'fetchShelfNode', args: { targetId: 'node-4' } },
+                    { label: '右の棚へ ▶', action: 'fetchShelfNode', args: { targetId: 'node-2' } },
+                    { label: '🚪 [奥の通路へワープ]', action: 'fetchShelfNode', args: { targetId: 'node-3' } } // 多様な接続の例
+                ]
+            },
+            'node-2': {
+                id: 'node-2',
+                name: '宇宙・天文学の棚 (B)',
+                books: [
+                    { title: '宇宙論の現在', color: '#2f4f4f' },
+                    { title: '恒星進化論', color: '#8b4513' },
+                    { title: 'ブラックホール物理', color: '#483d8b' }
+                ],
+                edges: [
+                    { label: '◀ 左の棚へ', action: 'fetchShelfNode', args: { targetId: 'node-1' } },
+                    { label: '右の棚へ ▶', action: 'fetchShelfNode', args: { targetId: 'node-3' } }
+                ]
+            },
+            'node-3': {
+                id: 'node-3',
+                name: '情報科学の棚 (C)',
+                books: [
+                    { title: 'アルゴリズムとデータ構造', color: '#006666' },
+                    { title: '人工知能の歴史', color: '#663399' },
+                    { title: '計算機アーキテクチャ', color: '#993333' }
+                ],
+                edges: [
+                    { label: '◀ 左の棚へ', action: 'fetchShelfNode', args: { targetId: 'node-2' } },
+                    { label: '右の棚へ ▶', action: 'fetchShelfNode', args: { targetId: 'node-4' } },
+                    { label: '🔄 [振り返る]', action: 'fetchShelfNode', args: { targetId: 'node-1' } }
+                ]
+            },
+            'node-4': {
+                id: 'node-4',
+                name: '数学の棚 (D)',
+                books: [
+                    { title: '線型代数特論', color: '#333366' },
+                    { title: '位相空間論', color: '#663333' },
+                    { title: '数理統計学入門', color: '#336633' }
+                ],
+                edges: [
+                    { label: '◀ 左の棚へ', action: 'fetchShelfNode', args: { targetId: 'node-3' } },
+                    { label: '右の棚へ ▶', action: 'fetchShelfNode', args: { targetId: 'node-1' } }
+                ]
+            }
+        };
+
+        // --- 2. アクション・レジストリ ---
+        const actionRegistry = {
+            fetchShelfNode: async (args) => {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(mockDatabase[args.targetId] || null);
+                    }, 120);
+                });
+            }
+        };
+
+        let currentNode = null;
+
+        // --- 3. レンダリング関数 ---
+        function renderShelf(node) {
+            currentNode = node;
+
+            // 棚タイトルの更新
+            document.getElementById('shelfTitle').textContent = `現在の棚: ${node.name} (${node.id})`;
+
+            // 背表紙の生成
+            const container = document.getElementById('spineContainer');
+            container.innerHTML = '';
+
+            node.books.forEach(book => {
+                const spine = document.createElement('div');
+                spine.className = 'spine';
+                spine.style.backgroundColor = book.color;
+                spine.textContent = book.title;
+                spine.title = book.title;
+                spine.onclick = () => alert(`「${book.title}」が選択されました`);
+                container.appendChild(spine);
+            });
+
+            // エッジ（配列）を元にナビゲーションボタンを動的生成
+            const navControls = document.getElementById('navControls');
+            navControls.innerHTML = '';
+
+            node.edges.forEach(edge => {
+                const btn = document.createElement('button');
+                btn.textContent = edge.label;
+                btn.onclick = () => triggerEdge(edge);
+                navControls.appendChild(btn);
+            });
+        }
+
+        // --- 4. エッジ実行のトリガー ---
+        async function triggerEdge(edge) {
+            const actionFn = actionRegistry[edge.action];
+            if (actionFn) {
+                const nextNode = await actionFn(edge.args);
+                if (nextNode) {
+                    renderShelf(nextNode);
+                }
+            }
+        }
+
+        // --- 初期起動 ---
+        (async () => {
+            const initialNode = await actionRegistry.fetchShelfNode({ targetId: 'node-1' });
+            renderShelf(initialNode);
+        })();
+    </script>
+</body>
+</html>
