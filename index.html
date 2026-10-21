@@ -63,6 +63,8 @@
             height: 220px;
             padding-bottom: 56px;
             z-index: 2;
+            width: 100%;
+            overflow-x: auto;
         }
 
         /* 背表紙のスタイル */
@@ -130,7 +132,9 @@
     <!-- 動的にエッジ（選択肢）のボタンが並ぶエリア -->
     <div class="nav-controls" id="navControls"></div>
 
-    <script>
+    <script type="module">
+        import { fetchShelfByOpenSearch } from './src/api.js';
+
         // --- 1. モックデータベース（edgesがシンプルな配列に変更） ---
         const mockDatabase = {
             'node-1': {
@@ -197,6 +201,12 @@
                         resolve(mockDatabase[args.targetId] || null);
                     }, 120);
                 });
+            },
+            fetchOpenSearchShelf: async (args) => {
+                const node = await fetchShelfByOpenSearch(args.searchParams);
+                node.name = args.name;
+                node.edges = args.edges || [];
+                return node;
             }
         };
 
@@ -248,7 +258,28 @@
 
         // --- 初期起動 ---
         (async () => {
-            const initialNode = await actionRegistry.fetchShelfNode({ targetId: 'node-1' });
+            const initialNode = await actionRegistry.fetchOpenSearchShelf({
+                name: '物理学 (NDLC: MC21)',
+                searchParams: { ndlc: 'MC21', cnt: 50 },
+                edges: [
+                    {
+                        label: '次の50冊へ (51件目から)',
+                        action: 'fetchOpenSearchShelf',
+                        args: {
+                            name: '物理学 (NDLC: MC21・51件目から)',
+                            searchParams: { ndlc: 'MC21', cnt: 50, page: 2 }
+                        }
+                    },
+                    {
+                        label: 'MC71の棚へ (50冊)',
+                        action: 'fetchOpenSearchShelf',
+                        args: {
+                            name: '物理学 (NDLC: MC71)',
+                            searchParams: { ndlc: 'MC71', cnt: 50 }
+                        }
+                    }
+                ]
+            });
             renderShelf(initialNode);
         })();
     </script>
