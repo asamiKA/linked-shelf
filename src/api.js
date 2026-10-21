@@ -51,6 +51,14 @@ export async function fetchShelfByOpenSearch(params = {}) {
             pubDate: item.querySelector('pubDate')?.textContent || ''
         }));
 
+        books.sort((a, b) => {
+            const yearA = a.pubDate.match(/\d{4}/)?.[0];
+            const yearB = b.pubDate.match(/\d{4}/)?.[0];
+            if (!yearA) return yearB ? 1 : 0;
+            if (!yearB) return -1;
+            return Number(yearB) - Number(yearA);
+        });
+
         // 書籍の組み合わせから一意の64文字ハッシュIDを生成
         const shelfId = await generateShelfId(books);
 
