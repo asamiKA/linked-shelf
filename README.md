@@ -45,3 +45,18 @@ GitHub Pagesで動作する軽量なSPA（シングルページアプリケー�
  [ ] Phase 2: NDLサーチAPI連携 (⁠api.js⁠) と、メタデータに基づく背表紙の決定論的レンダリング（Canvas/DOM）
  [ ] Phase 3: 隣接ノードのプリロード機構と動的ビューポートキャッシュ
  [ ] Phase 4: 3D書庫空間（Three.js）とストリートビュー風の没入型ナビゲーション
+
+### ディレクトリ構造
+
+```
+linked-shelf/
+├── README.md                 # プロジェクトの解説と方針（作成済み）
+├── package.json              # 依存関係やビルド設定（Vite等を使う場合）
+├── vite.config.js            # Viteの設定（GitHub Pagesのbaseパス指定など）
+├── index.html                # エントリポイント（HTMLの殻とCSS読込）
+└── src/
+    ├── main.js               # アプリ全体の初期化・状態管理・イベント駆動のメイン処理
+    ├── api.js                # NDL OpenSearch API連携 ＆ SHA-256ハッシュID生成
+    ├── registry.js           # エッジ用アクションのカタログ（Action Registry）
+    └── style.css             # スタイルシート（見た目の分離）
+```
