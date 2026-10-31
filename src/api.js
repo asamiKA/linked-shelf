@@ -16,20 +16,34 @@ export async function generateShelfId(books) {
 }
 
 /**
- * NDL OpenSearch APIを叩いてShelfNodeを構築する
+ * NDL SRU APIを叩いてShelfNodeを構築する
  * @param {Object} params - 検索パラメータ (例: { title: '量子力学', ndlc: 'MC21', cnt: 5 })
  * @returns {Promise<Object>} ShelfNodeオブジェクト { id, books, edges }
  */
-export async function fetchShelfByOpenSearch(params = {}) {
-    const baseUrl = 'https://ndlsearch.ndl.go.jp/api/opensearch';
-    
-    // デフォルトパラメータの補完とURLSearchParamsの構築
-    const queryParams = new URLSearchParams({
-        title: params.title || '物理学',
-        cnt: params.cnt || 5,
-        ...params
-    });
+export async function fetchShelfBySru(params = {}) {
+    const baseUrl = 'https://ndlsearch.ndl.go.jp/api/sru';
+    const count = Number(params.cnt) || 5;
+    const page = Math.max(1, Number(params.page) || 1);
+    const quoteCql = value => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    const clauses = [
+        `title = ${quoteCql(params.title || '物理学')}`,
+        `mediatype = "books"`
+    ];
+    if (params.ndlc) {
+        clauses.push(`ndlc = ${quoteCql(params.ndlc)}`);
+    }
 
+    const queryParams = new URLSearchParams({
+        operation: 'searchRetrieve',
+        version: '1.2',
+        recordSchema: 'dcndl',
+        recordPacking: 'xml',
+        onlyBib: 'true',
+        maximumRecords: count,
+        startRecord: (page - 1) * count + 1,
+        query: clauses.join(' AND '),
+        sortBy: 'issued_date/sort.descending'
+    });
     const url = `${baseUrl}?${queryParams.toString()}`;
 
     try {
@@ -41,15 +55,35 @@ export async function fetchShelfByOpenSearch(params = {}) {
         const xmlText = await response.text();
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+        if (xmlDoc.getElementsByTagName('parsererror').length > 0 ||
+            xmlDoc.documentElement?.localName !== 'searchRetrieveResponse') {
+            throw new Error('Invalid NDL SRU response');
+        }
 
-        // RSS/XMLの <item> タグから書籍情報を抽出
-        const items = Array.from(xmlDoc.querySelectorAll('item'));
-        const books = items.map(item => ({
-            title: item.querySelector('title')?.textContent || '無題',
-            creator: item.querySelector('author')?.textContent || item.querySelector('creator')?.textContent || '著作者不明',
-            link: item.querySelector('link')?.textContent || '',
-            pubDate: item.querySelector('pubDate')?.textContent || ''
-        }));
+        const getElementsByLocalName = (element, name) =>
+            Array.from(element.getElementsByTagNameNS('*', name));
+        const getText = (element, names) => {
+            for (const name of names) {
+                const text = getElementsByLocalName(element, name)[0]?.textContent?.trim();
+                if (text) return text;
+            }
+            return '';
+        };
+        const books = Array.from(xmlDoc.getElementsByTagNameNS('*', 'record'))
+            .map(record => {
+                const bibResource = getElementsByLocalName(record, 'BibResource')[0];
+                if (!bibResource) return null;
+                return {
+                    title: getText(bibResource, ['title']) || '無題',
+                    creator: getText(bibResource, ['creator']) || '著作者不明',
+                    link: bibResource.getAttributeNS(
+                        'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+                        'about'
+                    )?.replace(/#.*$/, '') || '',
+                    pubDate: getText(bibResource, ['issued', 'date'])
+                };
+            })
+            .filter(Boolean);
 
         // 書籍の組み合わせから一意の64文字ハッシュIDを生成
         const shelfId = await generateShelfId(books);
@@ -61,7 +95,7 @@ export async function fetchShelfByOpenSearch(params = {}) {
         };
 
     } catch (error) {
-        console.error('Failed to fetch NDL OpenSearch API:', error);
+        console.error('Failed to fetch NDL SRU API:', error);
         return {
             id: 'error-node',
             books: [{ title: 'データの取得に失敗しました', creator: '', link: '', pubDate: '' }],
