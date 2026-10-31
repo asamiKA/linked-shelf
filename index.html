@@ -63,34 +63,6 @@
             z-index: 2;
         }
 
-        .overhead-light {
-            position: absolute;
-            top: 19px;
-            left: 50%;
-            width: 38px;
-            height: 20px;
-            transform: translateX(-50%);
-            border: 2px solid #aeb7ba;
-            border-radius: 50%;
-            background: radial-gradient(ellipse, #fffef1 0 32%, #f5eecf 58%, #b8c0c1 78%);
-            box-shadow: 0 0 8px 3px rgba(255, 248, 211, 0.75), 0 0 28px 12px rgba(255, 246, 203, 0.24);
-            z-index: 1;
-        }
-
-        .overhead-light::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            width: 230px;
-            height: 210px;
-            transform: translateX(-50%);
-            background: linear-gradient(rgba(255, 248, 218, 0.12), rgba(255, 248, 218, 0));
-            clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
-            pointer-events: none;
-        }
-
-        /* 本棚の板 */
         .shelf-board {
             position: absolute;
             bottom: 40px;
@@ -106,7 +78,7 @@
             gap: 8px;
             align-items: flex-end;
             height: 220px;
-            padding-bottom: 56px;
+            padding-bottom: 38px;
             z-index: 2;
             width: 100%;
             overflow-x: auto;
@@ -148,7 +120,6 @@
 <body>
 
     <div class="scene">
-        <div class="overhead-light" aria-hidden="true"></div>
         <div class="shelf-title" id="shelfTitle">現在の棚: 読み込み中...</div>
         <div class="debug-info" id="debugInfo"></div>
         
@@ -242,6 +213,28 @@
 
         let currentNode = null;
 
+        function getBookHeight(title) {
+            return 136 + Array.from(title).reduce((hash, character) => (
+                (hash * 31 + character.codePointAt(0)) >>> 0
+            ), 0) % 49;
+        }
+
+        function getTitleLayout(title, bookHeight) {
+            const characters = Array.from(title);
+            const availableHeight = bookHeight - 18;
+            const minimumFontSize = 9;
+            const fontSize = Math.max(
+                minimumFontSize,
+                Math.min(12, Math.floor(availableHeight / (characters.length * (4 / 3))))
+            );
+            const maximumCharacters = Math.floor(availableHeight / (minimumFontSize * (4 / 3)));
+            const displayTitle = characters.length > maximumCharacters
+                ? `${characters.slice(0, maximumCharacters - 3).join('')}...`
+                : title;
+
+            return { displayTitle, fontSize };
+        }
+
         // --- 3. レンダリング関数 ---
         function renderShelf(node) {
             currentNode = node;
@@ -263,11 +256,16 @@
                 const spine = document.createElement('div');
                 spine.className = 'spine book-spine';
                 spine.style.setProperty('--book-color', book.color);
+                const bookHeight = getBookHeight(book.title);
+                spine.style.setProperty('--book-height', `${bookHeight}px`);
                 spine.title = book.title;
                 spine.onclick = () => alert(`「${book.title}」が選択されました`);
                 const title = document.createElement('span');
                 title.className = 'book-title';
-                title.textContent = book.title;
+                const { displayTitle, fontSize } = getTitleLayout(book.title, bookHeight);
+                title.setAttribute('aria-label', book.title);
+                title.style.setProperty('--title-size', `${fontSize}pt`);
+                title.textContent = displayTitle;
                 spine.appendChild(title);
                 container.appendChild(spine);
             });

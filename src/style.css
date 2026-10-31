@@ -38,29 +38,54 @@
 
 .book-spine {
     width: 32px; /* 本によって幅を変えるとリアルさUP */
-    height: 160px; /* 本によって高さをランダムに変える（140px〜180pxなど） */
+    height: var(--book-height, 160px);
     position: relative;
-    writing-mode: vertical-rl; /* 縦書き */
-    padding: 8px 4px;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 10px 4px 8px;
     box-sizing: border-box;
     cursor: pointer;
     
-    /* 背表紙の丸み（中央が明るく、両端に向かって暗くなるグラデーション） */
+    /* 背表紙の反射と丸み */
     background: linear-gradient(
         90deg,
-        rgba(0, 0, 0, 0.5) 0%,
-        rgba(255, 255, 255, 0.15) 15%,
-        rgba(255, 255, 255, 0.3) 50%,
-        rgba(0, 0, 0, 0.4) 85%,
-        rgba(0, 0, 0, 0.7) 100%
+        rgba(0, 0, 0, 0.58) 0,
+        rgba(255, 255, 255, 0.13) 12%,
+        rgba(255, 255, 255, 0.28) 43%,
+        rgba(0, 0, 0, 0.18) 68%,
+        rgba(0, 0, 0, 0.62) 100%
     ), var(--book-color, #2b3a67); /* ベースの色 */
     
-    /* 本自体の立体感と、隣との境界の影 */
-    box-shadow: 
-        -4px 2px 6px rgba(0, 0, 0, 0.4), /* 右隣に落とす影 */
-        inset 1px 0 2px rgba(255, 255, 255, 0.4); /* 左端のハイライト（角の丸み） */
+    box-shadow:
+        -4px 2px 6px rgba(0, 0, 0, 0.4),
+        3px 6px 7px rgba(0, 0, 0, 0.42),
+        inset 1px 0 2px rgba(255, 255, 255, 0.4);
     
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.book-spine::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 3px;
+    right: 3px;
+    height: 4px;
+    background: repeating-linear-gradient(90deg, #d6c8ad 0 1px, #8e826e 1px 2px);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    opacity: 0.75;
+}
+
+.book-spine::after {
+    content: "";
+    position: absolute;
+    top: 7px;
+    bottom: 7px;
+    left: 4px;
+    width: 2px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.38), rgba(0, 0, 0, 0.4));
+    box-shadow: 2px 0 2px rgba(0, 0, 0, 0.22);
+    opacity: 0.72;
 }
 
 /* ホバー時に少し手前に飛び出す演出 */
@@ -74,12 +99,14 @@
 
 /* タイトル文字（箔押し風の微かな立体感） */
 .book-title {
-    font-size: 12px;
+    --title-size: 12pt;
+    font-size: var(--title-size);
     color: #f5f5f5;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+    line-height: 1;
+    max-height: calc(var(--book-height, 160px) - 18px);
     overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 6; /* 6行以上は省略 */
-    -webkit-box-orient: vertical;
+    white-space: nowrap;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
 }

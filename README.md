@@ -5,6 +5,10 @@
 
 デモサイト: [https://asamika.github.io/linked-shelf/](https://asamika.github.io/linked-shelf/)
 
+## デザイン確認
+
+`design-preview.html` はAPI問い合わせを行わず、固定のサンプル本で書架と背表紙の見た目だけを確認するためのページです。ブラウザで直接開けます。
+
 ---
 
 ## 🌟 コンセプト
