@@ -45,6 +45,8 @@ export async function fetchShelfBySru(params = {}) {
         sortBy: 'issued_date/sort.descending'
     });
     const url = `${baseUrl}?${queryParams.toString()}`;
+    const requestStartedAt = performance.now();
+    let responseTimeMs;
 
     try {
         const response = await fetch(url);
@@ -53,6 +55,7 @@ export async function fetchShelfBySru(params = {}) {
         }
 
         const xmlText = await response.text();
+        responseTimeMs = Math.round(performance.now() - requestStartedAt);
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
         if (xmlDoc.getElementsByTagName('parsererror').length > 0 ||
@@ -91,7 +94,8 @@ export async function fetchShelfBySru(params = {}) {
         return {
             id: shelfId,
             books: books,
-            edges: [] // 後続のロジックやアクション定義で動的に付与
+            edges: [], // 後続のロジックやアクション定義で動的に付与
+            debug: { requestUrl: url, responseTimeMs }
         };
 
     } catch (error) {
@@ -99,7 +103,11 @@ export async function fetchShelfBySru(params = {}) {
         return {
             id: 'error-node',
             books: [{ title: 'データの取得に失敗しました', creator: '', link: '', pubDate: '' }],
-            edges: []
+            edges: [],
+            debug: {
+                requestUrl: url,
+                responseTimeMs: responseTimeMs ?? Math.round(performance.now() - requestStartedAt)
+            }
         };
     }
 }
