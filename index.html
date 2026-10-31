@@ -49,6 +49,20 @@
             z-index: 2;
         }
 
+        .debug-info {
+            position: absolute;
+            top: 38px;
+            left: 20px;
+            right: 20px;
+            max-height: 72px;
+            overflow: auto;
+            color: #aeb7ba;
+            font-size: 10px;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+            z-index: 2;
+        }
+
         .overhead-light {
             position: absolute;
             top: 19px;
@@ -136,6 +150,7 @@
     <div class="scene">
         <div class="overhead-light" aria-hidden="true"></div>
         <div class="shelf-title" id="shelfTitle">現在の棚: 読み込み中...</div>
+        <div class="debug-info" id="debugInfo"></div>
         
         <div class="spine-container" id="spineContainer">
             <!-- 背表紙がここに動的に生成されます -->
@@ -233,6 +248,12 @@
 
             // 棚タイトルの更新
             document.getElementById('shelfTitle').textContent = `現在の棚: ${node.name} (${node.id})`;
+            const debug = node.debug || {};
+            document.getElementById('debugInfo').textContent = [
+                `リクエストURL: ${debug.requestUrl || '—'}`,
+                `NDL API応答時間: ${debug.responseTimeMs == null ? '—' : `${debug.responseTimeMs} ms`}`,
+                `棚ハッシュ: ${node.id}`
+            ].join('\n');
 
             // 背表紙の生成
             const container = document.getElementById('spineContainer');
