@@ -27,7 +27,9 @@ export async function fetchShelfBySru(params = {}) {
     const quoteCql = value => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
     const clauses = [
         `title = ${quoteCql(params.title || '物理学')}`,
-        `mediatype = "books"`
+        `mediatype = "books"`,
+        'from = "1701"',
+        'sortBy = issued_date/sort.ascending'
     ];
     if (params.ndlc) {
         clauses.push(`ndlc = ${quoteCql(params.ndlc)}`);
@@ -41,8 +43,7 @@ export async function fetchShelfBySru(params = {}) {
         onlyBib: 'true',
         maximumRecords: count,
         startRecord: (page - 1) * count + 1,
-        query: clauses.join(' AND '),
-        sortBy: 'issued_date/sort.descending'
+        query: clauses.join(' AND ')
     });
     const url = `${baseUrl}?${queryParams.toString()}`;
     const requestStartedAt = performance.now();
@@ -72,6 +73,13 @@ export async function fetchShelfBySru(params = {}) {
             }
             return '';
         };
+        const getSeries = bibResource => {
+            const series = getText(bibResource, ['seriesTitle', 'series']);
+            if (series) return series;
+
+            const parent = getElementsByLocalName(bibResource, 'isPartOf')[0];
+            return parent ? getText(parent, ['title']) : '';
+        };
         const books = Array.from(xmlDoc.getElementsByTagNameNS('*', 'record'))
             .map(record => {
                 const bibResource = getElementsByLocalName(record, 'BibResource')[0];
@@ -83,7 +91,8 @@ export async function fetchShelfBySru(params = {}) {
                         'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
                         'about'
                     )?.replace(/#.*$/, '') || '',
-                    pubDate: getText(bibResource, ['issued', 'date'])
+                    pubDate: getText(bibResource, ['issued', 'date']),
+                    series: getSeries(bibResource)
                 };
             })
             .filter(Boolean);

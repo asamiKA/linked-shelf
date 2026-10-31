@@ -73,27 +73,23 @@
     <main class="scene" aria-label="書架デザイン確認">
         <div class="shelf-title">書架デザイン確認</div>
         <div class="spine-container">
-            <div class="spine book-spine" style="--book-color: #191970"><span class="book-title">量子力学入門</span></div>
-            <div class="spine book-spine" style="--book-color: #8b0000"><span class="book-title">相対性理論概説</span></div>
-            <div class="spine book-spine" style="--book-color: #556b2f"><span class="book-title">統計力学の基礎</span></div>
-            <div class="spine book-spine" style="--book-color: #2f4f4f"><span class="book-title">宇宙論の現在</span></div>
-            <div class="spine book-spine" style="--book-color: #8b4513"><span class="book-title">恒星進化論</span></div>
-            <div class="spine book-spine" style="--book-color: #483d8b"><span class="book-title">ブラックホール物理</span></div>
-            <div class="spine book-spine" style="--book-color: #006666"><span class="book-title">アルゴリズムとデータ構造</span></div>
-            <div class="spine book-spine" style="--book-color: #663399"><span class="book-title">人工知能の歴史</span></div>
-            <div class="spine book-spine" style="--book-color: #993333"><span class="book-title">計算機アーキテクチャ</span></div>
-            <div class="spine book-spine" style="--book-color: #333366"><span class="book-title">線型代数特論</span></div>
-            <div class="spine book-spine" style="--book-color: #663333"><span class="book-title">位相空間論</span></div>
-            <div class="spine book-spine" style="--book-color: #336633"><span class="book-title">数理統計学入門</span></div>
+            <div class="spine book-spine"><span class="book-title">量子力学入門</span></div>
+            <div class="spine book-spine"><span class="book-title">相対性理論概説</span></div>
+            <div class="spine book-spine"><span class="book-title">統計力学の基礎</span></div>
+            <div class="spine book-spine"><span class="book-title">宇宙論の現在</span></div>
+            <div class="spine book-spine"><span class="book-title">恒星進化論</span></div>
+            <div class="spine book-spine"><span class="book-title">ブラックホール物理</span></div>
+            <div class="spine book-spine"><span class="book-title">アルゴリズムとデータ構造</span></div>
+            <div class="spine book-spine"><span class="book-title">人工知能の歴史</span></div>
+            <div class="spine book-spine"><span class="book-title">計算機アーキテクチャ</span></div>
+            <div class="spine book-spine"><span class="book-title">線型代数特論</span></div>
+            <div class="spine book-spine"><span class="book-title">位相空間論</span></div>
+            <div class="spine book-spine"><span class="book-title">数理統計学入門</span></div>
         </div>
         <div class="shelf-board" aria-hidden="true"></div>
     </main>
-    <script>
-        function getBookHeight(title) {
-            return 136 + Array.from(title).reduce((hash, character) => (
-                (hash * 31 + character.codePointAt(0)) >>> 0
-            ), 0) % 49;
-        }
+    <script type="module">
+        import { getBookDesign } from './src/book-design.js';
 
         function getTitleLayout(title, bookHeight) {
             const characters = Array.from(title);
@@ -114,10 +110,11 @@
         document.querySelectorAll('.book-spine').forEach(spine => {
             const title = spine.querySelector('.book-title');
             const fullTitle = title.textContent;
-            const bookHeight = getBookHeight(fullTitle);
-            const { displayTitle, fontSize } = getTitleLayout(fullTitle, bookHeight);
+            const design = getBookDesign({ title: fullTitle });
+            const { displayTitle, fontSize } = getTitleLayout(fullTitle, design.height);
 
-            spine.style.setProperty('--book-height', `${bookHeight}px`);
+            spine.style.setProperty('--book-color', design.color);
+            spine.style.setProperty('--book-height', `${design.height}px`);
             title.setAttribute('aria-label', fullTitle);
             title.style.setProperty('--title-size', `${fontSize}pt`);
             title.textContent = displayTitle;

@@ -135,6 +135,7 @@
 
     <script type="module">
         import { fetchShelfBySru } from './src/api.js';
+        import { getBookDesign } from './src/book-design.js';
 
         // --- 1. モックデータベース（edgesがシンプルな配列に変更） ---
         const mockDatabase = {
@@ -213,12 +214,6 @@
 
         let currentNode = null;
 
-        function getBookHeight(title) {
-            return 136 + Array.from(title).reduce((hash, character) => (
-                (hash * 31 + character.codePointAt(0)) >>> 0
-            ), 0) % 49;
-        }
-
         function getTitleLayout(title, bookHeight) {
             const characters = Array.from(title);
             const availableHeight = bookHeight - 18;
@@ -255,14 +250,14 @@
             node.books.forEach(book => {
                 const spine = document.createElement('div');
                 spine.className = 'spine book-spine';
-                spine.style.setProperty('--book-color', book.color);
-                const bookHeight = getBookHeight(book.title);
-                spine.style.setProperty('--book-height', `${bookHeight}px`);
+                const design = getBookDesign(book);
+                spine.style.setProperty('--book-color', design.color);
+                spine.style.setProperty('--book-height', `${design.height}px`);
                 spine.title = book.title;
                 spine.onclick = () => alert(`「${book.title}」が選択されました`);
                 const title = document.createElement('span');
                 title.className = 'book-title';
-                const { displayTitle, fontSize } = getTitleLayout(book.title, bookHeight);
+                const { displayTitle, fontSize } = getTitleLayout(book.title, design.height);
                 title.setAttribute('aria-label', book.title);
                 title.style.setProperty('--title-size', `${fontSize}pt`);
                 title.textContent = displayTitle;
