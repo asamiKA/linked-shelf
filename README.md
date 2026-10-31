@@ -56,7 +56,7 @@ linked-shelf/
 ├── index.html                # エントリポイント（HTMLの殻とCSS読込）
 └── src/
     ├── main.js               # アプリ全体の初期化・状態管理・イベント駆動のメイン処理
-    ├── api.js                # NDL OpenSearch API連携 ＆ SHA-256ハッシュID生成
+    ├── api.js                # NDL SRU API連携 ＆ SHA-256ハッシュID生成
     ├── registry.js           # エッジ用アクションのカタログ（Action Registry）
     └── style.css             # スタイルシート（見た目の分離）
 ```
