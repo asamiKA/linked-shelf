@@ -3,216 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bookshelf Graph Navigator (Array Edges)</title>
+    <title>Bookshelf Graph Navigator</title>
     <link rel="stylesheet" href="./src/style.css">
     <style>
         body {
             margin: 0;
-            padding: 0;
+            min-height: 100vh;
             background-color: #15191b;
             color: #f0e6d2;
             font-family: sans-serif;
+            overflow-x: hidden;
+        }
+
+        .shelf-list {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0 16px 96px;
         }
 
         .scene {
             position: relative;
-            width: 600px;
-            height: 350px;
+            width: calc(100vw - 32px);
+            height: 198px;
             background:
-                radial-gradient(ellipse 2px 3px at 7px 18px, #30373a 0 1px, transparent 2px) left top / 15px 36px repeat-y,
-                radial-gradient(ellipse 2px 3px at 7px 18px, #30373a 0 1px, transparent 2px) right top / 15px 36px repeat-y,
-                linear-gradient(90deg, #737c80 0 15px, #353c40 15px 20px, transparent 20px calc(100% - 20px), #353c40 calc(100% - 20px) calc(100% - 15px), #737c80 calc(100% - 15px)),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 48px 100%,
                 linear-gradient(180deg, #3d4549, #252b2e 75%, #1c2225);
-            border: 4px solid #7b858a;
-            border-radius: 4px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 0 0 2px #41494d;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            padding: 20px;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.45);
             box-sizing: border-box;
         }
 
-        .shelf-title {
+        .scene::before,
+        .scene::after {
+            content: "";
             position: absolute;
-            top: 15px;
-            left: 20px;
-            font-size: 14px;
-            color: #d2d9db;
-            letter-spacing: 1px;
-            z-index: 2;
+            top: 0;
+            bottom: 0;
+            width: 24px;
+            background:
+                linear-gradient(90deg, #9aa5a9, #566268 32%, #313b40 68%, #778287);
+            box-shadow:
+                inset 2px 0 rgba(255, 255, 255, 0.24),
+                inset -3px 0 rgba(0, 0, 0, 0.48);
+            z-index: 3;
+        }
+
+        .scene::before {
+            left: 0;
+        }
+
+        .scene::after {
+            right: 0;
+        }
+
+        .shelf-title {
+            display: none;
         }
 
         .debug-info {
+            display: none;
+        }
+
+        .scene.show-debug .debug-info {
+            display: block;
             position: absolute;
-            top: 38px;
-            left: 20px;
-            right: 20px;
-            max-height: 72px;
+            top: 8px;
+            left: 32px;
+            right: 32px;
+            max-height: 120px;
             overflow: auto;
-            color: #aeb7ba;
+            padding: 8px;
+            background: rgba(15, 19, 21, 0.94);
+            color: #d2d9db;
             font-size: 10px;
             overflow-wrap: anywhere;
             white-space: pre-wrap;
-            z-index: 2;
+            z-index: 4;
         }
 
         .shelf-board {
             position: absolute;
-            bottom: 40px;
-            left: 20px;
-            right: 20px;
-            height: 18px;
+            right: 24px;
+            bottom: 0;
+            left: 24px;
             z-index: 2;
         }
 
-        /* 背表紙コンテナ */
         .spine-container {
+            position: absolute;
+            right: 28px;
+            bottom: 18px;
+            left: 28px;
             display: flex;
             gap: 8px;
             align-items: flex-end;
-            height: 220px;
-            padding-bottom: 38px;
+            height: 180px;
+            padding-bottom: 0;
             z-index: 2;
-            width: 100%;
             overflow-x: auto;
         }
 
-        /* 背表紙のスタイル */
         .spine {
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        /* ナビゲーションボタン群（動的生成） */
-        .nav-controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            width: 600px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        button {
-            background: #3e2d22;
-            color: #f0e6d2;
-            border: 1px solid #5c4333;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
+        .loading-status {
+            margin: 0;
+            color: #aeb7ba;
             font-size: 14px;
-            transition: background 0.2s;
-        }
-
-        button:hover {
-            background: #5c4333;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-
-    <div class="scene">
-        <div class="shelf-title" id="shelfTitle">現在の棚: 読み込み中...</div>
-        <div class="debug-info" id="debugInfo"></div>
-        
-        <div class="spine-container" id="spineContainer">
-            <!-- 背表紙がここに動的に生成されます -->
-        </div>
-
-        <div class="shelf-board"></div>
-    </div>
-
-    <!-- 動的にエッジ（選択肢）のボタンが並ぶエリア -->
-    <div class="nav-controls" id="navControls"></div>
+    <main class="shelf-list" id="shelfList" aria-live="polite"></main>
+    <p class="loading-status" id="loadingStatus">棚を読み込み中...</p>
 
     <script type="module">
         import { fetchShelfBySru } from './src/api.js';
         import { getBookDesign } from './src/book-design.js';
 
-        // --- 1. モックデータベース（edgesがシンプルな配列に変更） ---
-        const mockDatabase = {
-            'node-1': {
-                id: 'node-1',
-                name: '物理学の棚 (A)',
-                books: [
-                    { title: '量子力学入門', color: '#191970' },
-                    { title: '相対性理論概説', color: '#8b0000' },
-                    { title: '統計力学の基礎', color: '#556b2f' }
-                ],
-                edges: [
-                    { label: '◀ 左の棚へ', action: 'fetchShelfNode', args: { targetId: 'node-4' } },
-                    { label: '右の棚へ ▶', action: 'fetchShelfNode', args: { targetId: 'node-2' } },
-                    { label: '🚪 [奥の通路へワープ]', action: 'fetchShelfNode', args: { targetId: 'node-3' } } // 多様な接続の例
-                ]
-            },
-            'node-2': {
-                id: 'node-2',
-                name: '宇宙・天文学の棚 (B)',
-                books: [
-                    { title: '宇宙論の現在', color: '#2f4f4f' },
-                    { title: '恒星進化論', color: '#8b4513' },
-                    { title: 'ブラックホール物理', color: '#483d8b' }
-                ],
-                edges: [
-                    { label: '◀ 左の棚へ', action: 'fetchShelfNode', args: { targetId: 'node-1' } },
-                    { label: '右の棚へ ▶', action: 'fetchShelfNode', args: { targetId: 'node-3' } }
-                ]
-            },
-            'node-3': {
-                id: 'node-3',
-                name: '情報科学の棚 (C)',
-                books: [
-                    { title: 'アルゴリズムとデータ構造', color: '#006666' },
-                    { title: '人工知能の歴史', color: '#663399' },
-                    { title: '計算機アーキテクチャ', color: '#993333' }
-                ],
-                edges: [
-                    { label: '◀ 左の棚へ', action: 'fetchShelfNode', args: { targetId: 'node-2' } },
-                    { label: '右の棚へ ▶', action: 'fetchShelfNode', args: { targetId: 'node-4' } },
-                    { label: '🔄 [振り返る]', action: 'fetchShelfNode', args: { targetId: 'node-1' } }
-                ]
-            },
-            'node-4': {
-                id: 'node-4',
-                name: '数学の棚 (D)',
-                books: [
-                    { title: '線型代数特論', color: '#333366' },
-                    { title: '位相空間論', color: '#663333' },
-                    { title: '数理統計学入門', color: '#336633' }
-                ],
-                edges: [
-                    { label: '◀ 左の棚へ', action: 'fetchShelfNode', args: { targetId: 'node-3' } },
-                    { label: '右の棚へ ▶', action: 'fetchShelfNode', args: { targetId: 'node-1' } }
-                ]
-            }
-        };
+        const MAX_SHELVES = 200;
+        const SHELF_HEIGHT = 198;
+        const SHELF_GAP = 0;
+        const MINIMUM_RENDER_INTERVAL_MS = 1000;
+        const searchParams = { ndlc: 'MC21' };
+        const shelfList = document.getElementById('shelfList');
+        const loadingStatus = document.getElementById('loadingStatus');
 
-        // --- 2. アクション・レジストリ ---
-        const actionRegistry = {
-            fetchShelfNode: async (args) => {
-                return new Promise(resolve => {
-                    setTimeout(() => {
-                        resolve(mockDatabase[args.targetId] || null);
-                    }, 120);
-                });
-            },
-            fetchSruShelf: async (args) => {
-                const node = await fetchShelfBySru(args.searchParams);
-                node.name = args.name;
-                node.edges = args.edges || [];
-                return node;
-            }
-        };
+        let nextStartRecord = 1;
+        let renderedShelfCount = 0;
+        let lastRenderedAt = 0;
+        let isLoadingShelf = false;
+        let hasMoreShelves = true;
+        let prefetchPromise = null;
+        let scrollTimer;
+        let resizeTimer;
 
-        let currentNode = null;
+        function getResponsiveRecordCount() {
+            const availableWidth = (window.visualViewport?.width || window.innerWidth) - 72;
+            return Math.max(10, Math.min(50, Math.floor(availableWidth / 40)));
+        }
 
         function getTitleLayout(title, bookHeight) {
             const characters = Array.from(title);
@@ -230,23 +165,37 @@
             return { displayTitle, fontSize };
         }
 
-        // --- 3. レンダリング関数 ---
-        function renderShelf(node) {
-            currentNode = node;
+        function createShelfElement(node, shelfNumber) {
+            const scene = document.createElement('section');
+            scene.className = 'scene';
+            scene.setAttribute('aria-label', `物理学の棚 ${shelfNumber}`);
 
-            // 棚タイトルの更新
-            document.getElementById('shelfTitle').textContent = `現在の棚: ${node.name} (${node.id})`;
-            const debug = node.debug || {};
-            document.getElementById('debugInfo').textContent = [
-                `リクエストURL: ${debug.requestUrl || '—'}`,
-                `NDL API応答時間: ${debug.responseTimeMs == null ? '—' : `${debug.responseTimeMs} ms`}`,
+            const title = document.createElement('div');
+            title.className = 'shelf-title';
+            title.textContent = `物理学 (NDLC: MC21) — 棚 ${shelfNumber}`;
+
+            const debug = document.createElement('div');
+            debug.className = 'debug-info';
+            const timing = node.debug.timing;
+            const debugLines = [
+                `開始レコード: ${node.debug.startRecord}`,
+                `表示冊数: ${node.books.length}`,
+                `NDL API通信: ${node.debug.responseTimeMs} ms${node.debug.cached ? '（キャッシュ再利用）' : ''}`,
+                `先読み待機: ${timing.prefetchWaitMs} ms`,
+                `データ準備: ${timing.dataPreparationMs} ms`,
+                `描画間隔待機: ${timing.renderIntervalWaitMs} ms`,
+                `キャッシュ: ${node.debug.cached ? `${node.debug.cachedRecordCount}件を再利用` : 'NDL APIから取得'}`,
                 `棚ハッシュ: ${node.id}`
-            ].join('\n');
+            ];
+            if (!node.debug.cached && node.debug.cqlQuery) {
+                debugLines.push(
+                    `CQL（デコード済み）:\n${node.debug.cqlQuery}`
+                );
+            }
+            debug.textContent = debugLines.join('\n');
 
-            // 背表紙の生成
-            const container = document.getElementById('spineContainer');
-            container.innerHTML = '';
-
+            const spineContainer = document.createElement('div');
+            spineContainer.className = 'spine-container';
             node.books.forEach(book => {
                 const spine = document.createElement('div');
                 spine.className = 'spine book-spine';
@@ -254,66 +203,186 @@
                 spine.style.setProperty('--book-color', design.color);
                 spine.style.setProperty('--book-height', `${design.height}px`);
                 spine.title = book.title;
-                spine.onclick = () => alert(`「${book.title}」が選択されました`);
-                const title = document.createElement('span');
-                title.className = 'book-title';
+                spine.addEventListener('click', () => alert(`「${book.title}」が選択されました`));
+
+                const bookTitle = document.createElement('span');
+                bookTitle.className = 'book-title';
                 const { displayTitle, fontSize } = getTitleLayout(book.title, design.height);
-                title.setAttribute('aria-label', book.title);
-                title.style.setProperty('--title-size', `${fontSize}pt`);
-                title.textContent = displayTitle;
-                spine.appendChild(title);
-                container.appendChild(spine);
+                bookTitle.setAttribute('aria-label', book.title);
+                bookTitle.style.setProperty('--title-size', `${fontSize}pt`);
+                bookTitle.textContent = displayTitle;
+                spine.appendChild(bookTitle);
+                spineContainer.appendChild(spine);
             });
 
-            // エッジ（配列）を元にナビゲーションボタンを動的生成
-            const navControls = document.getElementById('navControls');
-            navControls.innerHTML = '';
-
-            node.edges.forEach(edge => {
-                const btn = document.createElement('button');
-                btn.textContent = edge.label;
-                btn.onclick = () => triggerEdge(edge);
-                navControls.appendChild(btn);
+            const shelfBoard = document.createElement('button');
+            const debugId = `debugInfo-${shelfNumber}`;
+            shelfBoard.className = 'shelf-board';
+            shelfBoard.type = 'button';
+            shelfBoard.setAttribute('aria-controls', debugId);
+            shelfBoard.setAttribute('aria-expanded', 'false');
+            shelfBoard.setAttribute('aria-label', `棚 ${shelfNumber} のデバッグ情報を表示`);
+            shelfBoard.addEventListener('click', () => {
+                const isExpanded = scene.classList.toggle('show-debug');
+                shelfBoard.setAttribute('aria-expanded', String(isExpanded));
             });
+            const shelfLabel = document.createElement('span');
+            shelfLabel.className = 'shelf-label';
+            shelfLabel.textContent = `NDLC: ${searchParams.ndlc} · 棚 ${String(shelfNumber).padStart(3, '0')}`;
+            shelfBoard.appendChild(shelfLabel);
+            debug.id = debugId;
+
+            scene.append(title, debug, spineContainer, shelfBoard);
+            return scene;
         }
 
-        // --- 4. エッジ実行のトリガー ---
-        async function triggerEdge(edge) {
-            const actionFn = actionRegistry[edge.action];
-            if (actionFn) {
-                const nextNode = await actionFn(edge.args);
-                if (nextNode) {
-                    renderShelf(nextNode);
-                }
+        function wait(milliseconds) {
+            return new Promise(resolve => setTimeout(resolve, milliseconds));
+        }
+
+        function updateStatus() {
+            if (renderedShelfCount >= MAX_SHELVES) {
+                loadingStatus.textContent = `表示上限の${MAX_SHELVES}棚に達しました`;
+            } else if (!hasMoreShelves) {
+                loadingStatus.textContent = 'これ以上の棚はありません';
+            } else if (isLoadingShelf) {
+                loadingStatus.textContent = '次の棚を読み込み中...';
+            } else {
+                loadingStatus.textContent = 'スクロールに応じて次の棚を読み込みます';
             }
         }
 
-        // --- 初期起動 ---
-        (async () => {
-            const initialNode = await actionRegistry.fetchSruShelf({
-                name: '物理学 (NDLC: MC21)',
-                searchParams: { ndlc: 'MC21', cnt: 50 },
-                edges: [
-                    {
-                        label: '次の50冊へ (51件目から)',
-                        action: 'fetchSruShelf',
-                        args: {
-                            name: '物理学 (NDLC: MC21・51件目から)',
-                            searchParams: { ndlc: 'MC21', cnt: 50, page: 2 }
-                        }
-                    },
-                    {
-                        label: 'MC71の棚へ (50冊)',
-                        action: 'fetchSruShelf',
-                        args: {
-                            name: '物理学 (NDLC: MC71)',
-                            searchParams: { ndlc: 'MC71', cnt: 50 }
-                        }
-                    }
-                ]
+        async function appendNextShelf() {
+            if (isLoadingShelf || !hasMoreShelves || renderedShelfCount >= MAX_SHELVES) {
+                return false;
+            }
+
+            isLoadingShelf = true;
+            updateStatus();
+            try {
+                const preparationStartedAt = performance.now();
+                let prefetchWaitMs = 0;
+                if (prefetchPromise) {
+                    const prefetchWaitStartedAt = performance.now();
+                    await prefetchPromise;
+                    prefetchWaitMs = Math.round(performance.now() - prefetchWaitStartedAt);
+                }
+
+                const count = getResponsiveRecordCount();
+                const node = await fetchShelfBySru({
+                    ...searchParams,
+                    startRecord: nextStartRecord,
+                    cnt: count,
+                    prefetch: true
+                });
+                if (node.id === 'error-node' || node.books.length === 0) {
+                    hasMoreShelves = false;
+                    return false;
+                }
+
+                const remainingDelay = Math.max(
+                    0,
+                    MINIMUM_RENDER_INTERVAL_MS - (Date.now() - lastRenderedAt)
+                );
+                if (lastRenderedAt && remainingDelay) await wait(remainingDelay);
+
+                node.debug.timing = {
+                    prefetchWaitMs,
+                    dataPreparationMs: Math.round(performance.now() - preparationStartedAt - remainingDelay),
+                    renderIntervalWaitMs: remainingDelay
+                };
+                shelfList.appendChild(createShelfElement(node, renderedShelfCount + 1));
+                renderedShelfCount += 1;
+                lastRenderedAt = Date.now();
+                nextStartRecord = node.debug.endRecord + 1;
+                return true;
+            } finally {
+                isLoadingShelf = false;
+                updateStatus();
+            }
+        }
+
+        function getShelvesPerViewport() {
+            return Math.ceil(window.innerHeight / (SHELF_HEIGHT + SHELF_GAP));
+        }
+
+        async function prefetchShelves(shelfCount) {
+            if (prefetchPromise || !hasMoreShelves || renderedShelfCount >= MAX_SHELVES) {
+                return prefetchPromise;
+            }
+
+            const count = getResponsiveRecordCount() * shelfCount;
+            prefetchPromise = fetchShelfBySru({
+                ...searchParams,
+                startRecord: nextStartRecord,
+                cnt: count,
+                prefetch: true
+            }).catch(error => {
+                console.error('Failed to prefetch shelves:', error);
+            }).finally(() => {
+                prefetchPromise = null;
             });
-            renderShelf(initialNode);
-        })();
+            return prefetchPromise;
+        }
+
+        function prefetchNextViewport() {
+            return prefetchShelves(getShelvesPerViewport());
+        }
+
+        async function renderInitialShelves() {
+            const firstShelfAppended = await appendNextShelf();
+            if (firstShelfAppended) {
+                const initialShelfCount = Math.ceil(
+                    (window.innerHeight * 2) / (SHELF_HEIGHT + SHELF_GAP)
+                );
+                void prefetchShelves(
+                    initialShelfCount - 1 + getShelvesPerViewport()
+                );
+            }
+
+            while (
+                hasMoreShelves &&
+                renderedShelfCount < MAX_SHELVES &&
+                shelfList.scrollHeight < window.innerHeight * 2
+            ) {
+                const appended = await appendNextShelf();
+                if (!appended) break;
+            }
+        }
+
+        async function ensureScrollBuffer() {
+            const remainingHeight = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
+            if (remainingHeight > window.innerHeight || isLoadingShelf) return;
+
+            while (
+                hasMoreShelves &&
+                renderedShelfCount < MAX_SHELVES &&
+                document.documentElement.scrollHeight - (window.scrollY + window.innerHeight) <= window.innerHeight
+            ) {
+                const appended = await appendNextShelf();
+                if (!appended) break;
+            }
+            void prefetchNextViewport();
+        }
+
+        window.addEventListener('scroll', () => {
+            clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(() => {
+                void ensureScrollBuffer();
+            }, 100);
+        }, { passive: true });
+
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                void prefetchNextViewport();
+                void ensureScrollBuffer();
+            }, 300);
+        });
+
+        requestAnimationFrame(() => {
+            void renderInitialShelves();
+        });
     </script>
 </body>
 </html>

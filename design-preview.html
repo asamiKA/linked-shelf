@@ -8,48 +8,64 @@
     <style>
         body {
             margin: 0;
-            padding: 0;
             min-height: 100vh;
             background-color: #15191b;
             color: #f0e6d2;
             font-family: sans-serif;
-            display: grid;
-            place-items: center;
+            overflow-x: hidden;
+        }
+
+        .preview-shelf-list {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0 16px;
         }
 
         .scene {
             position: relative;
-            width: min(600px, calc(100vw - 32px));
-            height: 350px;
+            width: calc(100vw - 32px);
+            height: 198px;
             background:
-                radial-gradient(ellipse 2px 3px at 7px 18px, #30373a 0 1px, transparent 2px) left top / 15px 36px repeat-y,
-                radial-gradient(ellipse 2px 3px at 7px 18px, #30373a 0 1px, transparent 2px) right top / 15px 36px repeat-y,
-                linear-gradient(90deg, #737c80 0 15px, #353c40 15px 20px, transparent 20px calc(100% - 20px), #353c40 calc(100% - 20px) calc(100% - 15px), #737c80 calc(100% - 15px)),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 48px 100%,
                 linear-gradient(180deg, #3d4549, #252b2e 75%, #1c2225);
-            border: 4px solid #7b858a;
-            border-radius: 4px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), inset 0 0 0 2px #41494d;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.45);
             box-sizing: border-box;
         }
 
-        .shelf-title {
+        .scene::before,
+        .scene::after {
+            content: "";
             position: absolute;
-            top: 15px;
-            left: 20px;
-            color: #d2d9db;
-            font-size: 14px;
-            letter-spacing: 1px;
+            top: 0;
+            bottom: 0;
+            width: 24px;
+            background: linear-gradient(90deg, #9aa5a9, #566268 32%, #313b40 68%, #778287);
+            box-shadow:
+                inset 2px 0 rgba(255, 255, 255, 0.24),
+                inset -3px 0 rgba(0, 0, 0, 0.48);
+            z-index: 3;
+        }
+
+        .scene::before {
+            left: 0;
+        }
+
+        .scene::after {
+            right: 0;
         }
 
         .spine-container {
             position: absolute;
-            right: 20px;
-            bottom: 58px;
-            left: 20px;
+            right: 28px;
+            bottom: 18px;
+            left: 28px;
             display: flex;
             gap: 8px;
             align-items: flex-end;
-            height: 220px;
+            height: 180px;
             overflow-x: auto;
         }
 
@@ -62,34 +78,26 @@
 
         .shelf-board {
             position: absolute;
-            right: 20px;
-            bottom: 40px;
-            left: 20px;
+            right: 24px;
+            bottom: 0;
+            left: 24px;
             z-index: 2;
+            cursor: default;
         }
     </style>
 </head>
 <body>
-    <main class="scene" aria-label="書架デザイン確認">
-        <div class="shelf-title">書架デザイン確認</div>
-        <div class="spine-container">
-            <div class="spine book-spine"><span class="book-title">量子力学入門</span></div>
-            <div class="spine book-spine"><span class="book-title">相対性理論概説</span></div>
-            <div class="spine book-spine"><span class="book-title">統計力学の基礎</span></div>
-            <div class="spine book-spine"><span class="book-title">宇宙論の現在</span></div>
-            <div class="spine book-spine"><span class="book-title">恒星進化論</span></div>
-            <div class="spine book-spine"><span class="book-title">ブラックホール物理</span></div>
-            <div class="spine book-spine"><span class="book-title">アルゴリズムとデータ構造</span></div>
-            <div class="spine book-spine"><span class="book-title">人工知能の歴史</span></div>
-            <div class="spine book-spine"><span class="book-title">計算機アーキテクチャ</span></div>
-            <div class="spine book-spine"><span class="book-title">線型代数特論</span></div>
-            <div class="spine book-spine"><span class="book-title">位相空間論</span></div>
-            <div class="spine book-spine"><span class="book-title">数理統計学入門</span></div>
-        </div>
-        <div class="shelf-board" aria-hidden="true"></div>
-    </main>
+    <main class="preview-shelf-list" id="previewShelfList"></main>
     <script type="module">
         import { getBookDesign } from './src/book-design.js';
+        import { mc21PreviewBooks } from './src/mc21-preview-books.js';
+
+        const shelfList = document.getElementById('previewShelfList');
+        let resizeTimer;
+
+        function getBookCount() {
+            return Math.max(10, Math.min(50, Math.floor((shelfList.clientWidth - 72) / 40)));
+        }
 
         function getTitleLayout(title, bookHeight) {
             const characters = Array.from(title);
@@ -107,18 +115,57 @@
             return { displayTitle, fontSize };
         }
 
-        document.querySelectorAll('.book-spine').forEach(spine => {
-            const title = spine.querySelector('.book-title');
-            const fullTitle = title.textContent;
-            const design = getBookDesign({ title: fullTitle });
-            const { displayTitle, fontSize } = getTitleLayout(fullTitle, design.height);
+        function createShelf(books, shelfIndex) {
+            const scene = document.createElement('section');
+            scene.className = 'scene';
+            scene.setAttribute('aria-label', `NDLC MC21 デザイン確認棚 ${shelfIndex + 1}`);
 
-            spine.style.setProperty('--book-color', design.color);
-            spine.style.setProperty('--book-height', `${design.height}px`);
-            title.setAttribute('aria-label', fullTitle);
-            title.style.setProperty('--title-size', `${fontSize}pt`);
-            title.textContent = displayTitle;
+            const spineContainer = document.createElement('div');
+            spineContainer.className = 'spine-container';
+            books.forEach(book => {
+                const spine = document.createElement('div');
+                spine.className = 'spine book-spine';
+                const design = getBookDesign(book);
+                spine.style.setProperty('--book-color', design.color);
+                spine.style.setProperty('--book-height', `${design.height}px`);
+
+                const title = document.createElement('span');
+                title.className = 'book-title';
+                const { displayTitle, fontSize } = getTitleLayout(book.title, design.height);
+                title.setAttribute('aria-label', book.title);
+                title.style.setProperty('--title-size', `${fontSize}pt`);
+                title.textContent = displayTitle;
+                spine.appendChild(title);
+                spineContainer.appendChild(spine);
+            });
+
+            const shelfBoard = document.createElement('div');
+            shelfBoard.className = 'shelf-board';
+            shelfBoard.setAttribute('aria-hidden', 'true');
+            const shelfLabel = document.createElement('span');
+            shelfLabel.className = 'shelf-label';
+            shelfLabel.textContent = `NDLC: MC21 · 棚 ${String(shelfIndex + 1).padStart(3, '0')}`;
+            shelfBoard.appendChild(shelfLabel);
+
+            scene.append(spineContainer, shelfBoard);
+            return scene;
+        }
+
+        function renderPreview() {
+            const count = getBookCount();
+            const shelves = [];
+            for (let index = 0; index < mc21PreviewBooks.length; index += count) {
+                shelves.push(createShelf(mc21PreviewBooks.slice(index, index + count), shelves.length));
+            }
+            shelfList.replaceChildren(...shelves);
+        }
+
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(renderPreview, 300);
         });
+
+        requestAnimationFrame(renderPreview);
     </script>
 </body>
 </html>

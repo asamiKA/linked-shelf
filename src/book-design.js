@@ -30,6 +30,6 @@ export function getBookDesign(book) {
 
     return {
         color: COLORS[value % COLORS.length],
-        height: 136 + value % 49
+        height: 132 + value % 49
     };
 }
