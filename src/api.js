@@ -26,7 +26,6 @@ export async function fetchShelfBySru(params = {}) {
     const initialFromYear = Math.max(1701, Number(params.fromYear) || 1701);
     const quoteCql = value => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
     const baseClauses = [
-        `title = ${quoteCql(params.title || '物理学')}`,
         'mediatype = "books"',
         `sortBy = issued_date/sort.${sortDirection}`
     ];
