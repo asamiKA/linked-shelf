@@ -91,6 +91,26 @@
             z-index: 2;
         }
 
+        .shelf-nav {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            z-index: 4;
+            width: 24px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .shelf-nav--left {
+            left: 0;
+        }
+
+        .shelf-nav--right {
+            right: 0;
+        }
+
         .spine-container {
             position: absolute;
             right: 28px;
@@ -141,8 +161,13 @@
         let isLoadingShelf = false;
         let hasMoreShelves = true;
         let prefetchPromise = null;
+        let shelfGeneration = 0;
         let scrollTimer;
         let resizeTimer;
+
+        function getNextNdlcCode(ndlc) {
+            return ndlc.replace(/\d+$/, digits => String(Number(digits) + 1).padStart(digits.length, '0'));
+        }
 
         function getResponsiveRecordCount() {
             const availableWidth = (window.visualViewport?.width || window.innerWidth) - 72;
@@ -168,11 +193,11 @@
         function createShelfElement(node, shelfNumber) {
             const scene = document.createElement('section');
             scene.className = 'scene';
-            scene.setAttribute('aria-label', `物理学の棚 ${shelfNumber}`);
+            scene.setAttribute('aria-label', `NDLC ${searchParams.ndlc} の棚 ${shelfNumber}`);
 
             const title = document.createElement('div');
             title.className = 'shelf-title';
-            title.textContent = `物理学 (NDLC: MC21) — 棚 ${shelfNumber}`;
+            title.textContent = `NDLC: ${searchParams.ndlc} — 棚 ${shelfNumber}`;
 
             const debug = document.createElement('div');
             debug.className = 'debug-info';
@@ -232,7 +257,17 @@
             shelfBoard.appendChild(shelfLabel);
             debug.id = debugId;
 
-            scene.append(title, debug, spineContainer, shelfBoard);
+            const nextNdlcCode = getNextNdlcCode(searchParams.ndlc);
+            const navigationButtons = ['left', 'right'].map(side => {
+                const button = document.createElement('button');
+                button.className = `shelf-nav shelf-nav--${side}`;
+                button.type = 'button';
+                button.setAttribute('aria-label', `NDLC ${nextNdlcCode} の書架を表示`);
+                button.addEventListener('click', advanceToNextNdlc);
+                return button;
+            });
+
+            scene.append(title, debug, spineContainer, shelfBoard, ...navigationButtons);
             return scene;
         }
 
@@ -257,6 +292,7 @@
                 return false;
             }
 
+            const generation = shelfGeneration;
             isLoadingShelf = true;
             updateStatus();
             try {
@@ -267,6 +303,7 @@
                     await prefetchPromise;
                     prefetchWaitMs = Math.round(performance.now() - prefetchWaitStartedAt);
                 }
+                if (generation !== shelfGeneration) return false;
 
                 const count = getResponsiveRecordCount();
                 const node = await fetchShelfBySru({
@@ -275,6 +312,7 @@
                     cnt: count,
                     prefetch: true
                 });
+                if (generation !== shelfGeneration) return false;
                 if (node.id === 'error-node' || node.books.length === 0) {
                     hasMoreShelves = false;
                     return false;
@@ -285,6 +323,7 @@
                     MINIMUM_RENDER_INTERVAL_MS - (Date.now() - lastRenderedAt)
                 );
                 if (lastRenderedAt && remainingDelay) await wait(remainingDelay);
+                if (generation !== shelfGeneration) return false;
 
                 node.debug.timing = {
                     prefetchWaitMs,
@@ -297,8 +336,10 @@
                 nextStartRecord = node.debug.endRecord + 1;
                 return true;
             } finally {
-                isLoadingShelf = false;
-                updateStatus();
+                if (generation === shelfGeneration) {
+                    isLoadingShelf = false;
+                    updateStatus();
+                }
             }
         }
 
@@ -311,6 +352,7 @@
                 return prefetchPromise;
             }
 
+            const generation = shelfGeneration;
             const count = getResponsiveRecordCount() * shelfCount;
             prefetchPromise = fetchShelfBySru({
                 ...searchParams,
@@ -320,17 +362,32 @@
             }).catch(error => {
                 console.error('Failed to prefetch shelves:', error);
             }).finally(() => {
-                prefetchPromise = null;
+                if (generation === shelfGeneration) prefetchPromise = null;
             });
             return prefetchPromise;
+        }
+
+        function advanceToNextNdlc() {
+            searchParams.ndlc = getNextNdlcCode(searchParams.ndlc);
+            shelfGeneration += 1;
+            nextStartRecord = 1;
+            renderedShelfCount = 0;
+            lastRenderedAt = 0;
+            isLoadingShelf = false;
+            hasMoreShelves = true;
+            prefetchPromise = null;
+            shelfList.replaceChildren();
+            updateStatus();
+            void renderInitialShelves(shelfGeneration);
         }
 
         function prefetchNextViewport() {
             return prefetchShelves(getShelvesPerViewport());
         }
 
-        async function renderInitialShelves() {
+        async function renderInitialShelves(generation = shelfGeneration) {
             const firstShelfAppended = await appendNextShelf();
+            if (generation !== shelfGeneration) return;
             if (firstShelfAppended) {
                 const initialShelfCount = Math.ceil(
                     (window.innerHeight * 2) / (SHELF_HEIGHT + SHELF_GAP)
@@ -341,6 +398,7 @@
             }
 
             while (
+                generation === shelfGeneration &&
                 hasMoreShelves &&
                 renderedShelfCount < MAX_SHELVES &&
                 shelfList.scrollHeight < window.innerHeight * 2
@@ -351,10 +409,12 @@
         }
 
         async function ensureScrollBuffer() {
+            const generation = shelfGeneration;
             const remainingHeight = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
             if (remainingHeight > window.innerHeight || isLoadingShelf) return;
 
             while (
+                generation === shelfGeneration &&
                 hasMoreShelves &&
                 renderedShelfCount < MAX_SHELVES &&
                 document.documentElement.scrollHeight - (window.scrollY + window.innerHeight) <= window.innerHeight
