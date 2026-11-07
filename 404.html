@@ -8,8 +8,9 @@
 <body>
     <script>
         const segments = window.location.pathname.split('/').filter(Boolean);
+        const ndlcWithSubRegex = /^[A-Z]{1,2}\d{1,4}(?:-[A-Z0-9]+)?$/;
         const routeIndex = segments.findIndex((segment, index) =>
-            /^[A-Za-z][A-Za-z0-9]*$/.test(segment) &&
+            (segment === 'A' || ndlcWithSubRegex.test(segment)) &&
             segments.length - index <= 3 &&
             segments.slice(index + 1).every(value => /^\d+$/.test(value))
         );
