@@ -101,3 +101,19 @@ export function getNextNdlcCode(ndlc) {
 
     return `A${characters.join('')}`;
 }
+
+export function getPreviousNdlcCode(ndlc) {
+    const numericCode = ndlc.match(/^(.*?)(\d+)$/);
+    if (numericCode) {
+        const number = Number(numericCode[2]);
+        return number > 0
+            ? `${numericCode[1]}${String(number - 1).padStart(numericCode[2].length, '0')}`
+            : null;
+    }
+
+    const last = ndlc.at(-1);
+    if (last && ((last > 'A' && last <= 'Z') || (last > 'a' && last <= 'z'))) {
+        return `${ndlc.slice(0, -1)}${String.fromCharCode(last.charCodeAt(0) - 1)}`;
+    }
+    return null;
+}

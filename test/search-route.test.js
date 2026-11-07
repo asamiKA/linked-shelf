@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
     buildLastViewedShelfPath,
     buildSearchPath,
+    getPreviousNdlcCode,
     completeSearchPath,
     getNextNdlcCode,
     isRootSearchPath,
@@ -97,4 +98,11 @@ test('advances numeric and alphabetic NDLC codes', () => {
     assert.equal(getNextNdlcCode('MC21'), 'MC22');
     assert.equal(getNextNdlcCode('A'), 'B');
     assert.equal(getNextNdlcCode('Z'), 'AA');
+});
+
+test('getPreviousNdlcCode decrements NDLC codes', () => {
+    assert.equal(getPreviousNdlcCode('MC21'), 'MC20');
+    assert.equal(getPreviousNdlcCode('MC0'), null);
+    assert.equal(getPreviousNdlcCode('B'), 'A');
+    assert.equal(getPreviousNdlcCode('A'), null);
 });
