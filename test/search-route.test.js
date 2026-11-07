@@ -26,8 +26,16 @@ test('parses search parameters after a deployment base path', () => {
         params: {
             ndlc: 'MC21',
             fromYear: 1980,
-            startRecord: 25
+            startRecord: 1
         }
+    });
+});
+
+test('ignores legacy result-order URL segments', () => {
+    assert.deepEqual(parseSearchRoute('/A1/1980/25/').params, {
+        ndlc: 'A1',
+        fromYear: 1980,
+        startRecord: 1
     });
 });
 
@@ -50,21 +58,21 @@ test('applies defaults to omitted or invalid parameter values', () => {
     });
 });
 
-test('builds a trailing-slash search path under the deployment base', () => {
+test('builds a trailing-slash search path without a result-order segment', () => {
     assert.equal(
         buildSearchPath('/linked-shelf', {
             ndlc: 'B',
             fromYear: 1000,
             startRecord: 1
         }),
-        '/linked-shelf/B/1000/1/'
+        '/linked-shelf/B/1000/'
     );
 });
 
 test('builds a resume path from the leftmost book publication year', () => {
     assert.equal(
         buildLastViewedShelfPath('/linked-shelf', 'MC21', { publicationYear: 1980 }),
-        '/linked-shelf/MC21/1980/1/'
+        '/linked-shelf/MC21/1980/'
     );
     assert.equal(buildLastViewedShelfPath('/', 'MC21', { publicationYear: null }), null);
 });
@@ -79,9 +87,10 @@ test('identifies a parameterless root route with or without a deployment base pa
 });
 
 test('completes incomplete search paths with defaults', () => {
-    assert.equal(completeSearchPath('/'), '/A1/1000/1/');
-    assert.equal(completeSearchPath('/A1/1980/'), '/A1/1980/1/');
-    assert.equal(completeSearchPath('/linked-shelf/MC21/'), '/linked-shelf/MC21/1000/1/');
+    assert.equal(completeSearchPath('/'), '/A1/1000/');
+    assert.equal(completeSearchPath('/A1/1980/'), '/A1/1980/');
+    assert.equal(completeSearchPath('/linked-shelf/MC21/'), '/linked-shelf/MC21/1000/');
+    assert.equal(completeSearchPath('/linked-shelf/MC21/1980/25/'), '/linked-shelf/MC21/1980/');
 });
 
 test('advances numeric and alphabetic NDLC codes', () => {

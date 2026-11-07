@@ -17,13 +17,20 @@ export async function fetchShelfBySru(params = {}) {
     const baseUrl = 'https://ndlsearch.ndl.go.jp/api/sru';
     const count = Math.max(1, Number(params.cnt) || 5);
     const page = Math.max(1, Number(params.page) || 1);
-    const sortDirection = params.sortDirection === 'descending' ? 'descending' : 'ascending';
+    const isOlderSearch = Number.isSafeInteger(Number(params.untilYear)) &&
+        Number(params.untilYear) >= 1000;
+    const sortDirection = isOlderSearch || params.sortDirection === 'descending'
+        ? 'descending'
+        : 'ascending';
     const startRecord = Math.max(
         1,
         Number(params.startRecord) || (page - 1) * count + 1
     );
     const endRecord = startRecord + count - 1;
     const initialFromYear = Math.max(1000, Number(params.fromYear) || 1000);
+    const initialQueryYear = isOlderSearch
+        ? Math.max(1000, Number(params.untilYear))
+        : initialFromYear;
     const quoteCql = value => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
     const baseClauses = [
         'mediatype = "books"',
@@ -35,7 +42,7 @@ export async function fetchShelfBySru(params = {}) {
 
     const buildQuery = fromYear => [
         ...baseClauses,
-        `from = "${fromYear}"`
+        `${isOlderSearch ? 'until' : 'from'} = "${fromYear}"`
     ].join(' AND ');
     const buildRequestUrl = (query, requestedStartRecord, maximumRecords) => {
         const queryParams = new URLSearchParams({
@@ -50,11 +57,11 @@ export async function fetchShelfBySru(params = {}) {
         });
         return `${baseUrl}?${queryParams.toString()}`;
     };
-    const cacheKey = `${baseClauses.join(' AND ')}|from=${initialFromYear}`;
+    const cacheKey = `${baseClauses.join(' AND ')}|${isOlderSearch ? 'until' : 'from'}=${initialQueryYear}`;
     const cache = recordCaches.get(cacheKey) || {
         records: [],
         recordKeys: new Set(),
-        fromYear: initialFromYear,
+        fromYear: initialQueryYear,
         segmentRecordCount: 0,
         segmentNewRecordCount: 0,
         exhausted: false
@@ -129,9 +136,15 @@ export async function fetchShelfBySru(params = {}) {
                     throw new Error('Cannot continue NDL SRU search without a publication year');
                 }
 
-                cache.fromYear = cache.segmentNewRecordCount === 0
-                    ? lastRecord.publicationYear + 1
-                    : lastRecord.publicationYear;
+                const nextQueryYear = isOlderSearch
+                    ? lastRecord.publicationYear - (cache.segmentNewRecordCount === 0 ? 1 : 0)
+                    : lastRecord.publicationYear + (cache.segmentNewRecordCount === 0 ? 1 : 0);
+                if (nextQueryYear < 1000) {
+                    cache.exhausted = true;
+                    break;
+                }
+
+                cache.fromYear = nextQueryYear;
                 cache.segmentRecordCount = 0;
                 cache.segmentNewRecordCount = 0;
             }
@@ -188,6 +201,7 @@ export async function fetchShelfBySru(params = {}) {
                 startRecord,
                 endRecord,
                 fromYear: cache.fromYear,
+                exhausted: cache.exhausted,
                 cqlQuery: fetchedRecords ? cqlQuery : ''
             }
         };

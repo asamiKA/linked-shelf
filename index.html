@@ -202,6 +202,7 @@
 
         searchRoute = parseCurrentSearchRoute();
         const searchParams = { ...searchRoute.params };
+        let currentUrlYear = searchParams.fromYear;
         const shelfList = document.getElementById('shelfList');
         const loadingStatus = document.getElementById('loadingStatus');
 
@@ -210,6 +211,12 @@
         let lastRenderedAt = 0;
         let isLoadingShelf = false;
         let hasMoreShelves = true;
+        let isLoadingOlderShelves = false;
+        let hasOlderBooks = true;
+        let previousYearBoundary = null;
+        let previousStartRecord = 1;
+        let lastScrollY = window.scrollY;
+        const displayedBookKeys = new Set();
         let prefetchPromise = null;
         let shelfGeneration = 0;
         let scrollTimer;
@@ -300,7 +307,14 @@
             });
             const shelfLabel = document.createElement('span');
             shelfLabel.className = 'shelf-label';
-            shelfLabel.textContent = `NDLC: ${searchParams.ndlc} · 棚 ${String(shelfNumber).padStart(3, '0')}`;
+            const publicationYears = [...new Set(
+                node.books.map(book => book.publicationYear).filter(Number.isSafeInteger)
+            )].sort((first, second) => first - second);
+            const yearLabel = publicationYears.length
+                ? publicationYears.join(', ')
+                : '出版年不明';
+            shelfLabel.textContent =
+                `NDLC: ${searchParams.ndlc} · ${yearLabel} · 棚 ${String(shelfNumber).padStart(3, '0')}`;
             shelfBoard.appendChild(shelfLabel);
             debug.id = debugId;
 
@@ -353,12 +367,192 @@
         function updateStatus() {
             if (renderedShelfCount >= MAX_SHELVES) {
                 loadingStatus.textContent = `表示上限の${MAX_SHELVES}棚に達しました`;
+            } else if (isLoadingOlderShelves) {
+                loadingStatus.textContent = 'より古い資料を読み込み中...';
+            } else if (!hasOlderBooks) {
+                loadingStatus.textContent = 'これより古い資料はありません';
             } else if (!hasMoreShelves) {
                 loadingStatus.textContent = 'これ以上の棚はありません';
             } else if (isLoadingShelf) {
                 loadingStatus.textContent = '次の棚を読み込み中...';
             } else {
                 loadingStatus.textContent = 'スクロールに応じて次の棚を読み込みます';
+            }
+        }
+
+        function updateSearchPathFromTopShelf() {
+            const topShelf = Array.from(shelfList.children).find(
+                scene => scene.getBoundingClientRect().bottom > 0
+            );
+            const year = Number(topShelf?.dataset.leftmostPublicationYear);
+            if (!Number.isSafeInteger(year) || year < 1000 || year === currentUrlYear) return;
+
+            currentUrlYear = year;
+            window.history.replaceState(
+                null,
+                '',
+                buildSearchPath(searchRoute.basePath, { ...searchParams, fromYear: year })
+            );
+        }
+
+        function getBookKey(book) {
+            return book.link || [
+                book.title,
+                book.creator,
+                book.pubDate
+            ].join('\u0000');
+        }
+
+        function addDisplayedBooks(books) {
+            books.forEach(book => displayedBookKeys.add(getBookKey(book)));
+        }
+
+        async function prependOlderShelves(generation = shelfGeneration) {
+            if (
+                isLoadingOlderShelves ||
+                !hasOlderBooks ||
+                renderedShelfCount >= MAX_SHELVES ||
+                shelfList.children.length === 0
+            ) {
+                return;
+            }
+
+            const firstShelf = shelfList.firstElementChild;
+            const initialBoundary = Number(firstShelf.dataset.leftmostPublicationYear);
+            if (!Number.isSafeInteger(initialBoundary) || initialBoundary < 1000) {
+                hasOlderBooks = false;
+                updateStatus();
+                return;
+            }
+
+            isLoadingOlderShelves = true;
+            updateStatus();
+            const shelfCapacity = getResponsiveRecordCount();
+            const targetBookCount = Math.min(
+                shelfCapacity * 2,
+                (MAX_SHELVES - renderedShelfCount) * shelfCapacity
+            );
+            const olderBooks = [];
+            const olderBookKeys = new Set();
+            let queryYear = previousYearBoundary ?? initialBoundary;
+            let startRecord = previousYearBoundary === null ? 1 : previousStartRecord;
+            let responseTimeMs = 0;
+            let cachedRecordCount = 0;
+            let cqlQuery = '';
+
+            try {
+                while (olderBooks.length < targetBookCount && queryYear >= 1000) {
+                    if (generation !== shelfGeneration) return;
+
+                    const requestedCount = targetBookCount - olderBooks.length;
+                    const node = await fetchShelfBySru({
+                        ndlc: searchParams.ndlc,
+                        untilYear: queryYear,
+                        startRecord,
+                        cnt: requestedCount
+                    });
+                    if (generation !== shelfGeneration) return;
+                    if (node.id === 'error-node') return;
+
+                    responseTimeMs += node.debug.responseTimeMs;
+                    cachedRecordCount = node.debug.cachedRecordCount;
+                    cqlQuery = node.debug.cqlQuery;
+                    const newBooks = node.books.filter(book => (
+                        !displayedBookKeys.has(getBookKey(book)) &&
+                        !olderBookKeys.has(getBookKey(book))
+                    ));
+                    olderBooks.push(...newBooks);
+                    newBooks.forEach(book => olderBookKeys.add(getBookKey(book)));
+
+                    if (node.books.length === 0) {
+                        if (startRecord === 1) {
+                            hasOlderBooks = false;
+                            break;
+                        }
+                        queryYear -= 1;
+                        startRecord = 1;
+                        previousYearBoundary = queryYear;
+                        previousStartRecord = startRecord;
+                        continue;
+                    }
+                    if (newBooks.length === 0) {
+                        if (node.books.length < requestedCount || node.debug.exhausted) {
+                            queryYear -= 1;
+                            startRecord = 1;
+                        } else {
+                            startRecord = node.debug.endRecord + 1;
+                        }
+                        previousYearBoundary = queryYear;
+                        previousStartRecord = startRecord;
+                        continue;
+                    }
+
+                    if (node.books.length < requestedCount || node.debug.exhausted) {
+                        const returnedYears = node.books
+                            .map(book => book.publicationYear)
+                            .filter(Number.isSafeInteger);
+                        queryYear = returnedYears.length
+                            ? Math.min(...returnedYears) - 1
+                            : queryYear - 1;
+                        startRecord = 1;
+                    } else {
+                        startRecord = node.debug.endRecord + 1;
+                    }
+                    previousYearBoundary = queryYear;
+                    previousStartRecord = startRecord;
+                }
+
+                if (generation !== shelfGeneration) return;
+                if (queryYear < 1000) {
+                    hasOlderBooks = false;
+                    if (olderBooks.length === 0) return;
+                }
+                if (olderBooks.length === 0) return;
+
+                const anchor = Array.from(shelfList.children).find(
+                    scene => scene.getBoundingClientRect().bottom > 0
+                );
+                const anchorTop = anchor?.getBoundingClientRect().top;
+                for (let index = 0; index < olderBooks.length; index += shelfCapacity) {
+                    const books = olderBooks.slice(index, index + shelfCapacity);
+                    const node = {
+                        id: '',
+                        books,
+                        debug: {
+                            startRecord: index + 1,
+                            endRecord: index + books.length,
+                            responseTimeMs,
+                            cached: false,
+                            cachedRecordCount,
+                            cqlQuery,
+                            timing: {
+                                prefetchWaitMs: 0,
+                                dataPreparationMs: 0,
+                                renderIntervalWaitMs: 0
+                            }
+                        }
+                    };
+                    shelfList.insertBefore(
+                        createShelfElement(node, renderedShelfCount + 1),
+                        shelfList.firstChild
+                    );
+                    renderedShelfCount += 1;
+                }
+                addDisplayedBooks(olderBooks);
+
+                if (anchor && Number.isFinite(anchorTop)) {
+                    await new Promise(resolve => requestAnimationFrame(() => {
+                        window.scrollBy(0, anchor.getBoundingClientRect().top - anchorTop);
+                        resolve();
+                    }));
+                }
+                updateSearchPathFromTopShelf();
+                rememberVisibleShelf();
+            } finally {
+                if (generation === shelfGeneration) {
+                    isLoadingOlderShelves = false;
+                    updateStatus();
+                }
             }
         }
 
@@ -406,6 +600,8 @@
                     renderIntervalWaitMs: remainingDelay
                 };
                 shelfList.appendChild(createShelfElement(node, renderedShelfCount + 1));
+                addDisplayedBooks(node.books);
+                updateSearchPathFromTopShelf();
                 renderedShelfCount += 1;
                 lastRenderedAt = Date.now();
                 nextStartRecord = node.debug.endRecord + 1;
@@ -446,12 +642,19 @@
         function resetSearch(route) {
             searchRoute = route;
             Object.assign(searchParams, route.params);
+            currentUrlYear = searchParams.fromYear;
             shelfGeneration += 1;
             nextStartRecord = searchParams.startRecord;
             renderedShelfCount = 0;
             lastRenderedAt = 0;
             isLoadingShelf = false;
             hasMoreShelves = true;
+            isLoadingOlderShelves = false;
+            hasOlderBooks = true;
+            previousYearBoundary = null;
+            previousStartRecord = 1;
+            displayedBookKeys.clear();
+            lastScrollY = window.scrollY;
             prefetchPromise = null;
             shelfList.replaceChildren();
             updateStatus();
@@ -463,6 +666,7 @@
                 basePath: searchRoute.basePath,
                 params: {
                     ...searchParams,
+                    fromYear: currentUrlYear,
                     ndlc: getNextNdlcCode(searchParams.ndlc)
                 }
             };
@@ -499,6 +703,9 @@
                 const appended = await appendNextShelf();
                 if (!appended) break;
             }
+            if (generation === shelfGeneration) {
+                await prependOlderShelves(generation);
+            }
         }
 
         async function ensureScrollBuffer() {
@@ -521,7 +728,13 @@
         window.addEventListener('scroll', () => {
             clearTimeout(scrollTimer);
             scrollTimer = setTimeout(() => {
+                const scrollY = window.scrollY;
+                if (scrollY < lastScrollY && scrollY < SHELF_HEIGHT * 2) {
+                    void prependOlderShelves();
+                }
+                lastScrollY = scrollY;
                 rememberVisibleShelf();
+                updateSearchPathFromTopShelf();
                 void ensureScrollBuffer();
             }, 100);
         }, { passive: true });
