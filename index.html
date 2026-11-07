@@ -138,6 +138,21 @@
             text-align: center;
         }
 
+        .loading-status--top {
+            position: fixed;
+            top: 8px;
+            left: 50%;
+            z-index: 10;
+            transform: translateX(-50%);
+            padding: 4px 12px;
+            border-radius: 12px;
+            background: rgba(21, 25, 27, 0.9);
+        }
+
+        .loading-status--top[hidden] {
+            display: none;
+        }
+
         .dpad {
             position: fixed;
             right: 16px;
@@ -185,6 +200,7 @@
     </style>
 </head>
 <body>
+    <p class="loading-status loading-status--top" id="loadingStatusTop" hidden>より古い資料を読み込み中...</p>
     <main class="shelf-list" id="shelfList" aria-live="polite"></main>
     <div class="dpad" id="dpad">
         <button type="button" class="dpad-up" id="dpadUp" aria-label="上の棚へ">↑</button>
@@ -258,6 +274,7 @@
         let currentUrlYear = searchParams.fromYear;
         const shelfList = document.getElementById('shelfList');
         const loadingStatus = document.getElementById('loadingStatus');
+        const loadingStatusTop = document.getElementById('loadingStatusTop');
 
         let nextStartRecord = searchParams.startRecord;
         let renderedShelfCount = 0;
@@ -271,6 +288,7 @@
         let lastScrollY = window.scrollY;
         const displayedBookKeys = new Set();
         let prefetchPromise = null;
+        let olderPrefetchPromise = null;
         let shelfGeneration = 0;
         let scrollTimer;
         let resizeTimer;
@@ -418,6 +436,7 @@
         }
 
         function updateStatus() {
+            loadingStatusTop.hidden = !isLoadingOlderShelves;
             if (renderedShelfCount >= MAX_SHELVES) {
                 loadingStatus.textContent = `表示上限の${MAX_SHELVES}棚に達しました`;
             } else if (isLoadingOlderShelves) {
@@ -606,6 +625,7 @@
                 if (generation === shelfGeneration) {
                     isLoadingOlderShelves = false;
                     updateStatus();
+                    void prefetchOlderShelves();
                 }
             }
         }
@@ -693,6 +713,31 @@
             return prefetchPromise;
         }
 
+        // Warm the record cache for the next upward (older years) load.
+        function prefetchOlderShelves() {
+            if (olderPrefetchPromise || isLoadingOlderShelves || !hasOlderBooks || renderedShelfCount >= MAX_SHELVES) {
+                return olderPrefetchPromise;
+            }
+            const firstShelf = shelfList.firstElementChild;
+            const firstYear = Number(firstShelf?.dataset.leftmostPublicationYear);
+            const queryYear = previousYearBoundary ?? firstYear - 1;
+            if (!Number.isSafeInteger(queryYear) || queryYear < 1000) return null;
+
+            const generation = shelfGeneration;
+            olderPrefetchPromise = fetchShelfBySru({
+                ndlc: searchParams.ndlc,
+                untilYear: queryYear,
+                startRecord: previousYearBoundary === null ? 1 : previousStartRecord,
+                cnt: getResponsiveRecordCount() * 2,
+                prefetch: true
+            }).catch(error => {
+                console.error('Failed to prefetch older shelves:', error);
+            }).finally(() => {
+                if (generation === shelfGeneration) olderPrefetchPromise = null;
+            });
+            return olderPrefetchPromise;
+        }
+
         function resetSearch(route) {
             searchRoute = route;
             Object.assign(searchParams, route.params);
@@ -710,6 +755,7 @@
             displayedBookKeys.clear();
             lastScrollY = window.scrollY;
             prefetchPromise = null;
+            olderPrefetchPromise = null;
             shelfList.replaceChildren();
             updateStatus();
             void updateNdlcControls();
@@ -782,6 +828,7 @@
 
         async function moveShelfUp() {
             if (window.scrollY > 1) {
+                if (window.scrollY <= SHELF_HEIGHT + SHELF_GAP) void prefetchOlderShelves();
                 window.scrollBy({ top: -SHELF_HEIGHT, behavior: 'smooth' });
                 return;
             }
@@ -875,6 +922,7 @@
             resizeTimer = setTimeout(() => {
                 rememberVisibleShelf();
                 void prefetchNextViewport();
+                void prefetchOlderShelves();
                 void ensureScrollBuffer();
             }, 300);
         });
