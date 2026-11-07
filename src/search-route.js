@@ -51,6 +51,24 @@ export function buildSearchPath(basePath, params) {
     return `${prefix}/${encodeURIComponent(params.ndlc)}/${params.fromYear}/${params.startRecord}/`;
 }
 
+export function buildLastViewedShelfPath(basePath, ndlc, firstBook) {
+    const publicationYear = firstBook?.publicationYear;
+    if (!Number.isSafeInteger(publicationYear) || publicationYear < DEFAULT_SEARCH_PARAMS.fromYear) {
+        return null;
+    }
+
+    return buildSearchPath(basePath, {
+        ndlc,
+        fromYear: publicationYear,
+        startRecord: DEFAULT_SEARCH_PARAMS.startRecord
+    });
+}
+
+export function isRootSearchPath(pathname, route) {
+    const normalizePath = path => path.replace(/\/+$/, '') || '/';
+    return normalizePath(pathname) === normalizePath(route.basePath);
+}
+
 export function completeSearchPath(pathname) {
     const route = parseSearchRoute(pathname);
     return buildSearchPath(route.basePath, route.params);

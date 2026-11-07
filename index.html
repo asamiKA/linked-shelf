@@ -147,9 +147,11 @@
         import { fetchShelfBySru } from './src/api.js';
         import { getBookDesign } from './src/book-design.js';
         import {
+            buildLastViewedShelfPath,
             buildSearchPath,
             completeSearchPath,
             getNextNdlcCode,
+            isRootSearchPath,
             parseSearchRoute
         } from './src/search-route.js';
 
@@ -169,6 +171,27 @@
         const SHELF_HEIGHT = 198;
         const SHELF_GAP = 0;
         const MINIMUM_RENDER_INTERVAL_MS = 1000;
+        let searchRoute = parseSearchRoute(window.location.pathname);
+        const LAST_VIEWED_SHELF_KEY = 'linked-shelf-last-viewed-route';
+        if (isRootSearchPath(window.location.pathname, searchRoute)) {
+            try {
+                const lastViewedPath = localStorage.getItem(LAST_VIEWED_SHELF_KEY);
+                if (lastViewedPath) {
+                    const lastViewedUrl = new URL(lastViewedPath, window.location.origin);
+                    const lastViewedRoute = parseSearchRoute(lastViewedUrl.pathname);
+                    if (
+                        lastViewedUrl.origin === window.location.origin &&
+                        lastViewedRoute.basePath === searchRoute.basePath &&
+                        !isRootSearchPath(lastViewedUrl.pathname, lastViewedRoute)
+                    ) {
+                        window.history.replaceState(null, '', lastViewedUrl.pathname);
+                        searchRoute = lastViewedRoute;
+                    }
+                }
+            } catch {
+            }
+        }
+
         function parseCurrentSearchRoute() {
             const completedPath = completeSearchPath(window.location.pathname);
             if (completedPath !== window.location.pathname) {
@@ -177,7 +200,7 @@
             return parseSearchRoute(completedPath);
         }
 
-        let searchRoute = parseCurrentSearchRoute();
+        searchRoute = parseCurrentSearchRoute();
         const searchParams = { ...searchRoute.params };
         const shelfList = document.getElementById('shelfList');
         const loadingStatus = document.getElementById('loadingStatus');
@@ -217,6 +240,7 @@
             const scene = document.createElement('section');
             scene.className = 'scene';
             scene.setAttribute('aria-label', `NDLC ${searchParams.ndlc} の棚 ${shelfNumber}`);
+            scene.dataset.leftmostPublicationYear = node.books[0]?.publicationYear ?? '';
 
             const title = document.createElement('div');
             title.className = 'shelf-title';
@@ -294,6 +318,34 @@
             return scene;
         }
 
+        function rememberVisibleShelf() {
+            let visibleShelf = null;
+            let maximumVisibleHeight = 0;
+            for (const scene of shelfList.children) {
+                const bounds = scene.getBoundingClientRect();
+                const visibleHeight = Math.max(
+                    0,
+                    Math.min(bounds.bottom, window.innerHeight) - Math.max(bounds.top, 0)
+                );
+                if (visibleHeight > maximumVisibleHeight) {
+                    visibleShelf = scene;
+                    maximumVisibleHeight = visibleHeight;
+                }
+            }
+            if (!visibleShelf) return;
+
+            const resumePath = buildLastViewedShelfPath(
+                searchRoute.basePath,
+                searchParams.ndlc,
+                { publicationYear: Number(visibleShelf.dataset.leftmostPublicationYear) }
+            );
+            if (!resumePath) return;
+            try {
+                localStorage.setItem(LAST_VIEWED_SHELF_KEY, resumePath);
+            } catch {
+            }
+        }
+
         function wait(milliseconds) {
             return new Promise(resolve => setTimeout(resolve, milliseconds));
         }
@@ -357,6 +409,7 @@
                 renderedShelfCount += 1;
                 lastRenderedAt = Date.now();
                 nextStartRecord = node.debug.endRecord + 1;
+                rememberVisibleShelf();
                 return true;
             } finally {
                 if (generation === shelfGeneration) {
@@ -468,6 +521,7 @@
         window.addEventListener('scroll', () => {
             clearTimeout(scrollTimer);
             scrollTimer = setTimeout(() => {
+                rememberVisibleShelf();
                 void ensureScrollBuffer();
             }, 100);
         }, { passive: true });
@@ -475,6 +529,7 @@
         window.addEventListener('resize', () => {
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(() => {
+                rememberVisibleShelf();
                 void prefetchNextViewport();
                 void ensureScrollBuffer();
             }, 300);
