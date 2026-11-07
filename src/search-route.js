@@ -51,6 +51,11 @@ export function buildSearchPath(basePath, params) {
     return `${prefix}/${encodeURIComponent(params.ndlc)}/${params.fromYear}/${params.startRecord}/`;
 }
 
+export function completeSearchPath(pathname) {
+    const route = parseSearchRoute(pathname);
+    return buildSearchPath(route.basePath, route.params);
+}
+
 export function getNextNdlcCode(ndlc) {
     const numericCode = ndlc.match(/^(.*?)(\d+)$/);
     if (numericCode) {
