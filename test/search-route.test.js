@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+    buildLastViewedShelfPath,
     buildSearchPath,
     getNextNdlcCode,
+    isRootSearchPath,
     parseSearchRoute
 } from '../src/search-route.js';
 
@@ -56,6 +58,23 @@ test('builds a trailing-slash search path under the deployment base', () => {
         }),
         '/linked-shelf/B/1000/1/'
     );
+});
+
+test('builds a resume path from the leftmost book publication year', () => {
+    assert.equal(
+        buildLastViewedShelfPath('/linked-shelf', 'MC21', { publicationYear: 1980 }),
+        '/linked-shelf/MC21/1980/1/'
+    );
+    assert.equal(buildLastViewedShelfPath('/', 'MC21', { publicationYear: null }), null);
+});
+
+test('identifies a parameterless root route with or without a deployment base path', () => {
+    assert.equal(isRootSearchPath('/', parseSearchRoute('/')), true);
+    assert.equal(
+        isRootSearchPath('/linked-shelf/', parseSearchRoute('/linked-shelf/')),
+        true
+    );
+    assert.equal(isRootSearchPath('/A1/1000/1/', parseSearchRoute('/A1/1000/1/')), false);
 });
 
 test('advances numeric and alphabetic NDLC codes', () => {
