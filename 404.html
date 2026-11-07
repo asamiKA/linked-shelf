@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookshelf Graph Navigator</title>
+</head>
+<body>
+    <script>
+        const segments = window.location.pathname.split('/').filter(Boolean);
+        const routeIndex = segments.findIndex((segment, index) =>
+            /^[A-Za-z][A-Za-z0-9]*$/.test(segment) &&
+            segments.length - index <= 3 &&
+            segments.slice(index + 1).every(value => /^\d+$/.test(value))
+        );
+
+        if (routeIndex >= 0) {
+            const basePath = routeIndex === 0
+                ? '/'
+                : `/${segments.slice(0, routeIndex).join('/')}/`;
+            try {
+                sessionStorage.setItem('linked-shelf-route', window.location.pathname);
+            } catch {
+            }
+            window.location.replace(basePath);
+        } else {
+            window.location.replace('/');
+        }
+    </script>
+</body>
+</html>

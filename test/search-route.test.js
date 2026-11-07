@@ -1,0 +1,65 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+    buildSearchPath,
+    getNextNdlcCode,
+    parseSearchRoute
+} from '../src/search-route.js';
+
+test('uses defaults when the URL has no search parameters', () => {
+    assert.deepEqual(parseSearchRoute('/'), {
+        basePath: '/',
+        params: {
+            ndlc: 'A',
+            fromYear: 1000,
+            startRecord: 1
+        }
+    });
+});
+
+test('parses search parameters after a deployment base path', () => {
+    assert.deepEqual(parseSearchRoute('/linked-shelf/MC21/1980/25/'), {
+        basePath: '/linked-shelf',
+        params: {
+            ndlc: 'MC21',
+            fromYear: 1980,
+            startRecord: 25
+        }
+    });
+});
+
+test('applies defaults to omitted or invalid parameter values', () => {
+    assert.deepEqual(parseSearchRoute('/A/'), {
+        basePath: '/',
+        params: {
+            ndlc: 'A',
+            fromYear: 1000,
+            startRecord: 1
+        }
+    });
+    assert.deepEqual(parseSearchRoute('/A/999/0/'), {
+        basePath: '/',
+        params: {
+            ndlc: 'A',
+            fromYear: 1000,
+            startRecord: 1
+        }
+    });
+});
+
+test('builds a trailing-slash search path under the deployment base', () => {
+    assert.equal(
+        buildSearchPath('/linked-shelf', {
+            ndlc: 'B',
+            fromYear: 1000,
+            startRecord: 1
+        }),
+        '/linked-shelf/B/1000/1/'
+    );
+});
+
+test('advances numeric and alphabetic NDLC codes', () => {
+    assert.equal(getNextNdlcCode('MC21'), 'MC22');
+    assert.equal(getNextNdlcCode('A'), 'B');
+    assert.equal(getNextNdlcCode('Z'), 'AA');
+});
