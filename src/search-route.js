@@ -1,5 +1,5 @@
 const DEFAULT_SEARCH_PARAMS = {
-    ndlc: 'A',
+    ndlc: 'A1',
     fromYear: 1000,
     startRecord: 1
 };

@@ -26,7 +26,7 @@ test('uses the URL issued-year start in the NDL search query', async t => {
     });
 
     await fetchShelfBySru({
-        ndlc: 'A',
+        ndlc: 'A1',
         fromYear: 1000,
         startRecord: 1,
         cnt: 1

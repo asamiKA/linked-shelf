@@ -10,7 +10,7 @@ test('uses defaults when the URL has no search parameters', () => {
     assert.deepEqual(parseSearchRoute('/'), {
         basePath: '/',
         params: {
-            ndlc: 'A',
+            ndlc: 'A1',
             fromYear: 1000,
             startRecord: 1
         }
@@ -29,18 +29,18 @@ test('parses search parameters after a deployment base path', () => {
 });
 
 test('applies defaults to omitted or invalid parameter values', () => {
-    assert.deepEqual(parseSearchRoute('/A/'), {
+    assert.deepEqual(parseSearchRoute('/A1/'), {
         basePath: '/',
         params: {
-            ndlc: 'A',
+            ndlc: 'A1',
             fromYear: 1000,
             startRecord: 1
         }
     });
-    assert.deepEqual(parseSearchRoute('/A/999/0/'), {
+    assert.deepEqual(parseSearchRoute('/A1/999/0/'), {
         basePath: '/',
         params: {
-            ndlc: 'A',
+            ndlc: 'A1',
             fromYear: 1000,
             startRecord: 1
         }
