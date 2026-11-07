@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
     buildSearchPath,
+    completeSearchPath,
     getNextNdlcCode,
     parseSearchRoute
 } from '../src/search-route.js';
@@ -56,6 +57,12 @@ test('builds a trailing-slash search path under the deployment base', () => {
         }),
         '/linked-shelf/B/1000/1/'
     );
+});
+
+test('completes incomplete search paths with defaults', () => {
+    assert.equal(completeSearchPath('/'), '/A1/1000/1/');
+    assert.equal(completeSearchPath('/A1/1980/'), '/A1/1980/1/');
+    assert.equal(completeSearchPath('/linked-shelf/MC21/'), '/linked-shelf/MC21/1000/1/');
 });
 
 test('advances numeric and alphabetic NDLC codes', () => {

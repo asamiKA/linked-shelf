@@ -148,6 +148,7 @@
         import { getBookDesign } from './src/book-design.js';
         import {
             buildSearchPath,
+            completeSearchPath,
             getNextNdlcCode,
             parseSearchRoute
         } from './src/search-route.js';
@@ -168,7 +169,15 @@
         const SHELF_HEIGHT = 198;
         const SHELF_GAP = 0;
         const MINIMUM_RENDER_INTERVAL_MS = 1000;
-        let searchRoute = parseSearchRoute(window.location.pathname);
+        function parseCurrentSearchRoute() {
+            const completedPath = completeSearchPath(window.location.pathname);
+            if (completedPath !== window.location.pathname) {
+                window.history.replaceState(null, '', completedPath);
+            }
+            return parseSearchRoute(completedPath);
+        }
+
+        let searchRoute = parseCurrentSearchRoute();
         const searchParams = { ...searchRoute.params };
         const shelfList = document.getElementById('shelfList');
         const loadingStatus = document.getElementById('loadingStatus');
@@ -409,7 +418,7 @@
         }
 
         window.addEventListener('popstate', () => {
-            resetSearch(parseSearchRoute(window.location.pathname));
+            resetSearch(parseCurrentSearchRoute());
         });
 
         function prefetchNextViewport() {
