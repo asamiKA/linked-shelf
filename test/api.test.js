@@ -35,6 +35,41 @@ test('uses the URL issued-year start in the NDL search query', async t => {
     assert.match(new URL(requestUrl).searchParams.get('query'), /from = "1000"/);
 });
 
+test('limits prefetched records to one maximum API request', async t => {
+    const originalParser = globalThis.DOMParser;
+    const originalFetch = globalThis.fetch;
+    let requestUrl;
+
+    globalThis.DOMParser = class {
+        parseFromString() {
+            return {
+                documentElement: { localName: 'searchRetrieveResponse' },
+                getElementsByTagName: () => [],
+                getElementsByTagNameNS: () => []
+            };
+        }
+    };
+    globalThis.fetch = async url => {
+        requestUrl = url;
+        return { ok: true, text: async () => '<searchRetrieveResponse />' };
+    };
+    t.after(() => {
+        globalThis.DOMParser = originalParser;
+        globalThis.fetch = originalFetch;
+    });
+
+    const node = await fetchShelfBySru({
+        ndlc: 'PREFETCH_LIMIT_TEST',
+        fromYear: 1000,
+        startRecord: 1,
+        cnt: 100,
+        prefetch: true
+    });
+
+    assert.equal(new URL(requestUrl).searchParams.get('maximumRecords'), '50');
+    assert.equal(node.debug.endRecord, 50);
+});
+
 test('uses a descending issued-year upper bound for older shelf searches', async t => {
     const originalParser = globalThis.DOMParser;
     const originalFetch = globalThis.fetch;
