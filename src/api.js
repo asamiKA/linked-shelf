@@ -23,7 +23,7 @@ export async function fetchShelfBySru(params = {}) {
         Number(params.startRecord) || (page - 1) * count + 1
     );
     const endRecord = startRecord + count - 1;
-    const initialFromYear = Math.max(1701, Number(params.fromYear) || 1701);
+    const initialFromYear = Math.max(1000, Number(params.fromYear) || 1000);
     const quoteCql = value => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
     const baseClauses = [
         'mediatype = "books"',

@@ -146,16 +146,34 @@
     <script type="module">
         import { fetchShelfBySru } from './src/api.js';
         import { getBookDesign } from './src/book-design.js';
+        import {
+            buildSearchPath,
+            getNextNdlcCode,
+            parseSearchRoute
+        } from './src/search-route.js';
+
+        try {
+            const recoveredPath = sessionStorage.getItem('linked-shelf-route');
+            if (recoveredPath) {
+                sessionStorage.removeItem('linked-shelf-route');
+                const recoveredUrl = new URL(recoveredPath, window.location.origin);
+                if (recoveredUrl.origin === window.location.origin) {
+                    window.history.replaceState(null, '', recoveredUrl.pathname);
+                }
+            }
+        } catch {
+        }
 
         const MAX_SHELVES = 200;
         const SHELF_HEIGHT = 198;
         const SHELF_GAP = 0;
         const MINIMUM_RENDER_INTERVAL_MS = 1000;
-        const searchParams = { ndlc: 'MC21' };
+        let searchRoute = parseSearchRoute(window.location.pathname);
+        const searchParams = { ...searchRoute.params };
         const shelfList = document.getElementById('shelfList');
         const loadingStatus = document.getElementById('loadingStatus');
 
-        let nextStartRecord = 1;
+        let nextStartRecord = searchParams.startRecord;
         let renderedShelfCount = 0;
         let lastRenderedAt = 0;
         let isLoadingShelf = false;
@@ -164,10 +182,6 @@
         let shelfGeneration = 0;
         let scrollTimer;
         let resizeTimer;
-
-        function getNextNdlcCode(ndlc) {
-            return ndlc.replace(/\d+$/, digits => String(Number(digits) + 1).padStart(digits.length, '0'));
-        }
 
         function getResponsiveRecordCount() {
             const availableWidth = (window.visualViewport?.width || window.innerWidth) - 72;
@@ -367,10 +381,11 @@
             return prefetchPromise;
         }
 
-        function advanceToNextNdlc() {
-            searchParams.ndlc = getNextNdlcCode(searchParams.ndlc);
+        function resetSearch(route) {
+            searchRoute = route;
+            Object.assign(searchParams, route.params);
             shelfGeneration += 1;
-            nextStartRecord = 1;
+            nextStartRecord = searchParams.startRecord;
             renderedShelfCount = 0;
             lastRenderedAt = 0;
             isLoadingShelf = false;
@@ -380,6 +395,22 @@
             updateStatus();
             void renderInitialShelves(shelfGeneration);
         }
+
+        function advanceToNextNdlc() {
+            const route = {
+                basePath: searchRoute.basePath,
+                params: {
+                    ...searchParams,
+                    ndlc: getNextNdlcCode(searchParams.ndlc)
+                }
+            };
+            window.history.pushState(null, '', buildSearchPath(route.basePath, route.params));
+            resetSearch(route);
+        }
+
+        window.addEventListener('popstate', () => {
+            resetSearch(parseSearchRoute(window.location.pathname));
+        });
 
         function prefetchNextViewport() {
             return prefetchShelves(getShelvesPerViewport());
