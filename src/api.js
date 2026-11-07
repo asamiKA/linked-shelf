@@ -12,6 +12,7 @@ export async function generateShelfId(books) {
 const recordCaches = new Map();
 const MAX_RECORDS_PER_REQUEST = 50;
 const MAX_RECORDS_PER_QUERY = 500;
+const REQUEST_TIMEOUT_MS = 30000;
 
 export async function fetchShelfBySru(params = {}) {
     const baseUrl = 'https://ndlsearch.ndl.go.jp/api/sru';
@@ -70,6 +71,12 @@ export async function fetchShelfBySru(params = {}) {
         exhausted: false
     };
     recordCaches.set(cacheKey, cache);
+
+    // Requests sharing a cache mutate its paging state, so they must run one at a time.
+    const previousLock = cache.lock || Promise.resolve();
+    let releaseLock;
+    cache.lock = new Promise(resolve => { releaseLock = resolve; });
+    await previousLock;
 
     let requestUrl = buildRequestUrl(buildQuery(cache.fromYear), startRecord, count);
     let cqlQuery = '';
@@ -164,7 +171,9 @@ export async function fetchShelfBySru(params = {}) {
                 maximumRecords
             );
             const requestStartedAt = performance.now();
-            const response = await fetch(requestUrl);
+            const response = await fetch(requestUrl, {
+                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+            });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -221,5 +230,7 @@ export async function fetchShelfBySru(params = {}) {
                 endRecord
             }
         };
+    } finally {
+        releaseLock();
     }
 }
