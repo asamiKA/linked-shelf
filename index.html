@@ -137,10 +137,78 @@
             font-size: 14px;
             text-align: center;
         }
+
+        .loading-status--top {
+            position: fixed;
+            top: 8px;
+            left: 50%;
+            z-index: 10;
+            transform: translateX(-50%);
+            padding: 4px 12px;
+            border-radius: 12px;
+            background: rgba(21, 25, 27, 0.9);
+        }
+
+        .loading-status--top[hidden] {
+            display: none;
+        }
+
+        .dpad {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            z-index: 10;
+            display: grid;
+            grid-template-columns: repeat(3, 44px);
+            grid-template-rows: repeat(3, 44px);
+            gap: 4px;
+            align-items: center;
+            justify-items: center;
+        }
+
+        .dpad button {
+            width: 44px;
+            height: 44px;
+            border: 1px solid #566268;
+            border-radius: 8px;
+            background: rgba(37, 43, 46, 0.92);
+            color: #f0e6d2;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .dpad button:disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
+
+        .dpad-up { grid-area: 1 / 2; }
+        .dpad-left { grid-area: 2 / 1; }
+        .dpad-right { grid-area: 2 / 3; }
+        .dpad-down { grid-area: 3 / 2; }
+
+        .dpad-ndlc {
+            grid-area: 2 / 2;
+            font-size: 11px;
+            line-height: 1.3;
+            text-align: center;
+            background: rgba(21, 25, 27, 0.9);
+            padding: 2px 4px;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
+    <p class="loading-status loading-status--top" id="loadingStatusTop" hidden>より古い資料を読み込み中...</p>
     <main class="shelf-list" id="shelfList" aria-live="polite"></main>
+    <div class="dpad" id="dpad">
+        <button type="button" class="dpad-up" id="dpadUp" aria-label="上の棚へ">↑</button>
+        <button type="button" class="dpad-left" id="dpadLeft" aria-label="前のNDLCへ">←</button>
+        <div class="dpad-ndlc" id="dpadNdlc"></div>
+        <button type="button" class="dpad-right" id="dpadRight" aria-label="次のNDLCへ">→</button>
+        <button type="button" class="dpad-down" id="dpadDown" aria-label="下の棚へ">↓</button>
+    </div>
     <p class="loading-status" id="loadingStatus">棚を読み込み中...</p>
 
     <script type="module">
@@ -151,6 +219,7 @@
             buildSearchPath,
             completeSearchPath,
             getNextNdlcCode,
+            getPreviousNdlcCode,
             isRootSearchPath,
             parseSearchRoute
         } from './src/search-route.js';
@@ -205,6 +274,7 @@
         let currentUrlYear = searchParams.fromYear;
         const shelfList = document.getElementById('shelfList');
         const loadingStatus = document.getElementById('loadingStatus');
+        const loadingStatusTop = document.getElementById('loadingStatusTop');
 
         let nextStartRecord = searchParams.startRecord;
         let renderedShelfCount = 0;
@@ -218,6 +288,7 @@
         let lastScrollY = window.scrollY;
         const displayedBookKeys = new Set();
         let prefetchPromise = null;
+        let olderPrefetchPromise = null;
         let shelfGeneration = 0;
         let scrollTimer;
         let resizeTimer;
@@ -365,6 +436,7 @@
         }
 
         function updateStatus() {
+            loadingStatusTop.hidden = !isLoadingOlderShelves;
             if (renderedShelfCount >= MAX_SHELVES) {
                 loadingStatus.textContent = `表示上限の${MAX_SHELVES}棚に達しました`;
             } else if (isLoadingOlderShelves) {
@@ -553,6 +625,7 @@
                 if (generation === shelfGeneration) {
                     isLoadingOlderShelves = false;
                     updateStatus();
+                    void prefetchOlderShelves();
                 }
             }
         }
@@ -640,6 +713,31 @@
             return prefetchPromise;
         }
 
+        // Warm the record cache for the next upward (older years) load.
+        function prefetchOlderShelves() {
+            if (olderPrefetchPromise || isLoadingOlderShelves || !hasOlderBooks || renderedShelfCount >= MAX_SHELVES) {
+                return olderPrefetchPromise;
+            }
+            const firstShelf = shelfList.firstElementChild;
+            const firstYear = Number(firstShelf?.dataset.leftmostPublicationYear);
+            const queryYear = previousYearBoundary ?? firstYear - 1;
+            if (!Number.isSafeInteger(queryYear) || queryYear < 1000) return null;
+
+            const generation = shelfGeneration;
+            olderPrefetchPromise = fetchShelfBySru({
+                ndlc: searchParams.ndlc,
+                untilYear: queryYear,
+                startRecord: previousYearBoundary === null ? 1 : previousStartRecord,
+                cnt: getResponsiveRecordCount() * 2,
+                prefetch: true
+            }).catch(error => {
+                console.error('Failed to prefetch older shelves:', error);
+            }).finally(() => {
+                if (generation === shelfGeneration) olderPrefetchPromise = null;
+            });
+            return olderPrefetchPromise;
+        }
+
         function resetSearch(route) {
             searchRoute = route;
             Object.assign(searchParams, route.params);
@@ -657,23 +755,102 @@
             displayedBookKeys.clear();
             lastScrollY = window.scrollY;
             prefetchPromise = null;
+            olderPrefetchPromise = null;
             shelfList.replaceChildren();
             updateStatus();
+            void updateNdlcControls();
             void renderInitialShelves(shelfGeneration);
         }
 
-        function advanceToNextNdlc() {
+        function goToNdlc(ndlc) {
             const route = {
                 basePath: searchRoute.basePath,
                 params: {
                     ...searchParams,
                     fromYear: currentUrlYear,
-                    ndlc: getNextNdlcCode(searchParams.ndlc)
+                    ndlc
                 }
             };
             window.history.pushState(null, '', buildSearchPath(route.basePath, route.params));
             resetSearch(route);
         }
+
+        function advanceToNextNdlc() {
+            goToNdlc(getNextNdlcCode(searchParams.ndlc));
+        }
+
+        const ndlcExistence = new Map();
+        function checkNdlcExists(ndlc) {
+            if (!ndlcExistence.has(ndlc)) {
+                ndlcExistence.set(ndlc, fetchShelfBySru({ ndlc, fromYear: 1000, cnt: 1 })
+                    .then(node => node.id !== 'error-node' && node.books.length > 0));
+            }
+            return ndlcExistence.get(ndlc);
+        }
+
+        const dpadButtons = {
+            up: document.getElementById('dpadUp'),
+            down: document.getElementById('dpadDown'),
+            left: document.getElementById('dpadLeft'),
+            right: document.getElementById('dpadRight')
+        };
+        const dpadNdlc = document.getElementById('dpadNdlc');
+
+        async function updateNdlcControls() {
+            const currentNdlc = searchParams.ndlc;
+            const targets = {
+                left: getPreviousNdlcCode(currentNdlc),
+                right: getNextNdlcCode(currentNdlc)
+            };
+            const labels = { left: '←', right: '→' };
+            const render = states => {
+                dpadNdlc.textContent = ['left', 'right'].map(side => (
+                    `${labels[side]} ${targets[side] ?? 'なし'}${states[side]}`
+                )).join('\n');
+                dpadNdlc.style.whiteSpace = 'pre';
+            };
+            const states = { left: '', right: '' };
+            for (const side of ['left', 'right']) {
+                dpadButtons[side].disabled = true;
+                if (targets[side] && targets[side] !== currentNdlc) states[side] = ' (確認中)';
+                else targets[side] = null;
+            }
+            render(states);
+
+            await Promise.all(['left', 'right'].map(async side => {
+                const exists = targets[side] ? await checkNdlcExists(targets[side]) : false;
+                if (currentNdlc !== searchParams.ndlc) return;
+                states[side] = targets[side] && !exists ? ' (なし)' : '';
+                dpadButtons[side].disabled = !exists;
+                render(states);
+            }));
+        }
+
+        async function moveShelfUp() {
+            if (window.scrollY > 1) {
+                if (window.scrollY <= SHELF_HEIGHT + SHELF_GAP) void prefetchOlderShelves();
+                window.scrollBy({ top: -SHELF_HEIGHT, behavior: 'smooth' });
+                return;
+            }
+            const before = shelfList.children.length;
+            await prependOlderShelves();
+            if (shelfList.children.length > before) {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function moveShelfDown() {
+            window.scrollBy({ top: SHELF_HEIGHT, behavior: 'smooth' });
+            void ensureScrollBuffer();
+        }
+
+        dpadButtons.up.addEventListener('click', () => void moveShelfUp());
+        dpadButtons.down.addEventListener('click', moveShelfDown);
+        dpadButtons.left.addEventListener('click', () => {
+            const target = getPreviousNdlcCode(searchParams.ndlc);
+            if (target) goToNdlc(target);
+        });
+        dpadButtons.right.addEventListener('click', advanceToNextNdlc);
 
         window.addEventListener('popstate', () => {
             resetSearch(parseCurrentSearchRoute());
@@ -745,10 +922,12 @@
             resizeTimer = setTimeout(() => {
                 rememberVisibleShelf();
                 void prefetchNextViewport();
+                void prefetchOlderShelves();
                 void ensureScrollBuffer();
             }, 300);
         });
 
+        void updateNdlcControls();
         requestAnimationFrame(() => {
             void renderInitialShelves();
         });
