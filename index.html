@@ -179,6 +179,7 @@
 
         let searchRoute = parseCurrentSearchRoute();
         const searchParams = { ...searchRoute.params };
+        let currentUrlYear = searchParams.fromYear;
         const shelfList = document.getElementById('shelfList');
         const loadingStatus = document.getElementById('loadingStatus');
 
@@ -217,6 +218,7 @@
             const scene = document.createElement('section');
             scene.className = 'scene';
             scene.setAttribute('aria-label', `NDLC ${searchParams.ndlc} の棚 ${shelfNumber}`);
+            scene.dataset.leftmostBookYear = node.books[0]?.publicationYear || '';
 
             const title = document.createElement('div');
             title.className = 'shelf-title';
@@ -310,6 +312,21 @@
             }
         }
 
+        function updateSearchPathFromTopShelf() {
+            const topShelf = Array.from(shelfList.children).find(
+                scene => scene.getBoundingClientRect().bottom > 0
+            );
+            const year = Number(topShelf?.dataset.leftmostBookYear);
+            if (!Number.isSafeInteger(year) || year < 1000 || year === currentUrlYear) return;
+
+            currentUrlYear = year;
+            window.history.replaceState(
+                null,
+                '',
+                buildSearchPath(searchRoute.basePath, { ...searchParams, fromYear: year })
+            );
+        }
+
         async function appendNextShelf() {
             if (isLoadingShelf || !hasMoreShelves || renderedShelfCount >= MAX_SHELVES) {
                 return false;
@@ -354,6 +371,7 @@
                     renderIntervalWaitMs: remainingDelay
                 };
                 shelfList.appendChild(createShelfElement(node, renderedShelfCount + 1));
+                updateSearchPathFromTopShelf();
                 renderedShelfCount += 1;
                 lastRenderedAt = Date.now();
                 nextStartRecord = node.debug.endRecord + 1;
@@ -393,6 +411,7 @@
         function resetSearch(route) {
             searchRoute = route;
             Object.assign(searchParams, route.params);
+            currentUrlYear = searchParams.fromYear;
             shelfGeneration += 1;
             nextStartRecord = searchParams.startRecord;
             renderedShelfCount = 0;
@@ -410,6 +429,7 @@
                 basePath: searchRoute.basePath,
                 params: {
                     ...searchParams,
+                    fromYear: currentUrlYear,
                     ndlc: getNextNdlcCode(searchParams.ndlc)
                 }
             };
@@ -468,6 +488,7 @@
         window.addEventListener('scroll', () => {
             clearTimeout(scrollTimer);
             scrollTimer = setTimeout(() => {
+                updateSearchPathFromTopShelf();
                 void ensureScrollBuffer();
             }, 100);
         }, { passive: true });

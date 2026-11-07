@@ -32,10 +32,7 @@ export function parseSearchRoute(pathname) {
                     DEFAULT_SEARCH_PARAMS.fromYear,
                     parsePositiveInteger(parameters[0], DEFAULT_SEARCH_PARAMS.fromYear)
                 ),
-                startRecord: parsePositiveInteger(
-                    parameters[1],
-                    DEFAULT_SEARCH_PARAMS.startRecord
-                )
+                startRecord: DEFAULT_SEARCH_PARAMS.startRecord
             }
         };
     }
@@ -48,7 +45,7 @@ export function parseSearchRoute(pathname) {
 
 export function buildSearchPath(basePath, params) {
     const prefix = basePath === '/' ? '' : basePath.replace(/\/+$/, '');
-    return `${prefix}/${encodeURIComponent(params.ndlc)}/${params.fromYear}/${params.startRecord}/`;
+    return `${prefix}/${encodeURIComponent(params.ndlc)}/${params.fromYear}/`;
 }
 
 export function completeSearchPath(pathname) {
