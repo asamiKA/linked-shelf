@@ -149,6 +149,7 @@
         import {
             buildLastViewedShelfPath,
             buildSearchPath,
+            completeSearchPath,
             getNextNdlcCode,
             isRootSearchPath,
             parseSearchRoute
@@ -190,6 +191,16 @@
             } catch {
             }
         }
+
+        function parseCurrentSearchRoute() {
+            const completedPath = completeSearchPath(window.location.pathname);
+            if (completedPath !== window.location.pathname) {
+                window.history.replaceState(null, '', completedPath);
+            }
+            return parseSearchRoute(completedPath);
+        }
+
+        searchRoute = parseCurrentSearchRoute();
         const searchParams = { ...searchRoute.params };
         const shelfList = document.getElementById('shelfList');
         const loadingStatus = document.getElementById('loadingStatus');
@@ -460,7 +471,7 @@
         }
 
         window.addEventListener('popstate', () => {
-            resetSearch(parseSearchRoute(window.location.pathname));
+            resetSearch(parseCurrentSearchRoute());
         });
 
         function prefetchNextViewport() {

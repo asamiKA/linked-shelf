@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
     buildLastViewedShelfPath,
     buildSearchPath,
+    completeSearchPath,
     getNextNdlcCode,
     isRootSearchPath,
     parseSearchRoute
@@ -75,6 +76,12 @@ test('identifies a parameterless root route with or without a deployment base pa
         true
     );
     assert.equal(isRootSearchPath('/A1/1000/1/', parseSearchRoute('/A1/1000/1/')), false);
+});
+
+test('completes incomplete search paths with defaults', () => {
+    assert.equal(completeSearchPath('/'), '/A1/1000/1/');
+    assert.equal(completeSearchPath('/A1/1980/'), '/A1/1980/1/');
+    assert.equal(completeSearchPath('/linked-shelf/MC21/'), '/linked-shelf/MC21/1000/1/');
 });
 
 test('advances numeric and alphabetic NDLC codes', () => {

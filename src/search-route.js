@@ -69,6 +69,11 @@ export function isRootSearchPath(pathname, route) {
     return normalizePath(pathname) === normalizePath(route.basePath);
 }
 
+export function completeSearchPath(pathname) {
+    const route = parseSearchRoute(pathname);
+    return buildSearchPath(route.basePath, route.params);
+}
+
 export function getNextNdlcCode(ndlc) {
     const numericCode = ndlc.match(/^(.*?)(\d+)$/);
     if (numericCode) {
