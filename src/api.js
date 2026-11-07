@@ -15,7 +15,10 @@ const MAX_RECORDS_PER_QUERY = 500;
 
 export async function fetchShelfBySru(params = {}) {
     const baseUrl = 'https://ndlsearch.ndl.go.jp/api/sru';
-    const count = Math.max(1, Number(params.cnt) || 5);
+    const requestedCount = Math.max(1, Number(params.cnt) || 5);
+    const count = params.prefetch
+        ? Math.min(MAX_RECORDS_PER_REQUEST, requestedCount)
+        : requestedCount;
     const page = Math.max(1, Number(params.page) || 1);
     const isOlderSearch = Number.isSafeInteger(Number(params.untilYear)) &&
         Number(params.untilYear) >= 1000;
