@@ -332,7 +332,7 @@
                     return false;
                 }
 
-                const remainingDelay = Math.max(
+                const remainingDelay = node.debug.cached ? 0 : Math.max(
                     0,
                     MINIMUM_RENDER_INTERVAL_MS - (Date.now() - lastRenderedAt)
                 );
