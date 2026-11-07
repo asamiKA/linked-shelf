@@ -434,7 +434,8 @@
             );
             const olderBooks = [];
             const olderBookKeys = new Set();
-            let queryYear = previousYearBoundary ?? initialBoundary;
+            // The initial boundary year is already shown from its first record onward, so search strictly older years.
+            let queryYear = previousYearBoundary ?? initialBoundary - 1;
             let startRecord = previousYearBoundary === null ? 1 : previousStartRecord;
             let responseTimeMs = 0;
             let cachedRecordCount = 0;
